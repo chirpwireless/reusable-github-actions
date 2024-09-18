@@ -27,11 +27,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: debug
-        run: |
-          echo $HOME
-          echo $GOCACHE
-          echo $GOPATH
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
