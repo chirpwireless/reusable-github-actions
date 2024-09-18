@@ -62,7 +62,7 @@ jobs:
         run: make test
       - name: Generate Version
         id: version
-        uses: ./.github/actions/calendar-version
+        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@feature/reusable-workflows-for-go
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
