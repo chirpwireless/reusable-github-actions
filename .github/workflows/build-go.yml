@@ -85,3 +85,5 @@ jobs:
     steps:
       # TODO: fix the version before merging
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@feature/reusable-workflows-for-go
+        with:
+          version: ${{ needs.build.outputs.service-version }}
