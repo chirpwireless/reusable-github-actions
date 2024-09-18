@@ -41,15 +41,13 @@ jobs:
         run: make test
       - name: Generate Version
         id: version
-        # TODO: fix the version before merging
-        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@feature/reusable-workflows-for-go
+        uses: ./.github/actions/calendar-version
 
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     needs: [ build ]
     steps:
-      # TODO: fix the version before merging
-      - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@feature/reusable-workflows-for-go
+      - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
         with:
           version: ${{ needs.build.outputs.service-version }}
