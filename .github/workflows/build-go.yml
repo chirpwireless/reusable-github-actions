@@ -1,0 +1,98 @@
+name: Build a Go microservice and publish it to Docker registry
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        description: "The service name to be published to Docker registry"
+        type: string
+        required: true
+      app_dir:
+        description: "Path to the go.mod file"
+        type: string
+        default: "."
+      skip_linter:
+        description: "A boolean flag to skip linter checks"
+        type: boolean
+        default: false
+    outputs:
+      new-version:
+        description: "The built service version"
+        value: ${{ jobs.build.outputs.service-version }}
+
+jobs:
+  build:
+    runs-on: [self-hosted, Linux, X64]
+    outputs:
+      service-version: ${{ steps.version.outputs.new_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: '${{ inputs.app_dir }}/go.mod'
+          cache-dependency-path: '${{ inputs.app_dir }}/go.sum'
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
+          private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+      - name: Configure Git to use installation token
+        run: |
+          git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+          printf "${{ secrets.GITLAB_NETRC }}" > ~/.netrc
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v6
+        if: ${{ inputs.skip_linter == false }}
+        with:
+          version: v1.59
+          working-directory: ${{ inputs.app_dir }}
+      - name: Install dependencies
+        run: make install
+      - name: Run build
+        run: make build
+      - name: Run tests
+        run: make test
+      - name: Generate Version
+        id: version
+        uses: ./.github/actions/calendar-version
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ steps.version.outputs.new_version }}
+
+  publish-release:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - id: create-release
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              const serviceVersion = "${{ needs.build.outputs.service-version }}";
+              const response = await github.rest.repos.createRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_name: serviceVersion,
+                name: serviceVersion,
+                draft: false,
+                prerelease: false,
+                target_commitish: context.sha,
+                generate_release_notes: true
+              });
+            } catch (error) {
+              core.setFailed(error.message);
+            }
