@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on:
-      group: Default
+      group: builder
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
@@ -47,7 +47,8 @@ jobs:
 
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: builder
     needs: [ build ]
     steps:
       # TODO: fix the version before merging
