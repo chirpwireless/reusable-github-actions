@@ -25,7 +25,8 @@ on:
         type: string
 jobs:
   deploy:
-    runs-on: arc-runner-set # TODO define based on the condition prod/non-prod
+    runs-on:
+      group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
     environment:
       name: ${{ inputs.environment }}
     steps:
