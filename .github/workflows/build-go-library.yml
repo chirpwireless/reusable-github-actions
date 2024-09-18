@@ -41,7 +41,7 @@ jobs:
         run: make test
       - name: Generate Version
         id: version
-        uses: ./.github/actions/calendar-version
+        uses: ./.github/actions/calendar-version@self
 
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
