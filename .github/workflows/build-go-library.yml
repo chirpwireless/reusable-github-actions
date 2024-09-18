@@ -45,7 +45,7 @@ jobs:
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@feature/reusable-workflows-for-go
 
   publish-release:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    # if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     needs: [ build ]
     steps:
