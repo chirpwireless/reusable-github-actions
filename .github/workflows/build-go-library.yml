@@ -3,7 +3,7 @@ on:
   workflow_call:
     outputs:
       new-version:
-        description: "The built library version"
+        description: "The new library version"
         value: ${{ jobs.build.outputs.service-version }}
 
 jobs:

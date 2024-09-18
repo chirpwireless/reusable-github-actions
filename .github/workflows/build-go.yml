@@ -16,7 +16,7 @@ on:
         default: false
     outputs:
       new-version:
-        description: "The built service version"
+        description: "The new service version"
         value: ${{ jobs.build.outputs.service-version }}
 
 jobs:
