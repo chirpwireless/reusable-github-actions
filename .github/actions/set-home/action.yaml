@@ -9,5 +9,5 @@ runs:
         export HOME="$RUNNER_TEMP/home_$GITHUB_RUN_ID"
         mkdir -p "$HOME"
         echo "HOME=$HOME" >> $GITHUB_ENV
-        Setting $HOME as the home dir
+        echo "Setting $HOME as the home dir"
       shell: sh
