@@ -29,4 +29,3 @@ jobs:
         with:
           helmfile-workdirectory: ${{ inputs.deploy_dir }}
           helmfile-args: apply --environment ${{ inputs.environment }}
-          helm-plugins: >
