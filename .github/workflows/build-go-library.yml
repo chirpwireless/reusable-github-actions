@@ -8,7 +8,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: builder
     env:
       HOME: ${{ runner.temp }}/home_${{ github.run_id }}
     outputs:
@@ -43,7 +44,7 @@ jobs:
         run: make test
       - name: Generate Version
         id: version
-        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
+        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@feature/reusable-workflows-for-go
 
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
