@@ -13,11 +13,6 @@ jobs:
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
-      - name: Set up unique HOME directory
-        run: |
-          export HOME="$RUNNER_TEMP/home_$GITHUB_RUN_ID"
-          mkdir -p "$HOME"
-          echo "HOME=$HOME" >> $GITHUB_ENV
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Set up Go
@@ -34,7 +29,7 @@ jobs:
       - name: Configure Git to use installation token
         run: |
           git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
-          printf "${{ secrets.GITLAB_NETRC }}" > "${HOME}/.netrc"
+          printf "${{ secrets.GITLAB_NETRC }}" > "${{ runner.home }}/.netrc"
       - name: Run linter
         uses: golangci/golangci-lint-action@v6
         with:
