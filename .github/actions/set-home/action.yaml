@@ -1,0 +1,13 @@
+name: 'Creates the $HOME variable'
+description: 'Sets the $HOME environment variable required for Go builds'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up unique HOME directory
+      run: |
+        export HOME="$RUNNER_TEMP/$GITHUB_REPOSITORY"
+        mkdir -p "$HOME"
+        echo "HOME=$HOME" >> $GITHUB_ENV
+        echo "Setting $HOME as the home dir"
+      shell: sh

@@ -1,0 +1,38 @@
+name: Deploy a microservice to a k8s cluster
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        description: "The service name to be deployed"
+        type: string
+        required: true
+      version:
+        required: true
+        description: "Version to be deployed"
+        type: string
+      environment:
+        required: true
+        description: "Environment (k8s namespace)"
+        type: string
+      deploy_dir:
+        required: true
+        description: "Path to the helm charts"
+        type: string
+      values_file:
+        required: true
+        description: "Path to the values file"
+        type: string
+jobs:
+  deploy:
+    runs-on:
+      group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4.2.0
+      - name: Helm upgrade
+        shell: sh
+        run: |
+          helm upgrade -i ${{ inputs.service_name }} ${{ inputs.deploy_dir }}/${{ inputs.service_name }} --namespace ${{ inputs.environment }} --wait --atomic --set image.tag=${{ inputs.version }} -f ${{ inputs.values_file }}

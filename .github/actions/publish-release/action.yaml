@@ -1,0 +1,30 @@
+name: 'Publish a new release'
+description: 'Creates a new Github release and tag'
+
+inputs:
+  version:
+    description: "Release version"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - id: create-release
+      uses: actions/github-script@v6
+      with:
+        script: |
+          try {
+            const serviceVersion = "${{ inputs.version }}";
+            const response = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: serviceVersion,
+              name: serviceVersion,
+              draft: false,
+              prerelease: false,
+              target_commitish: context.sha,
+              generate_release_notes: true
+            });
+          } catch (error) {
+            core.setFailed(error.message);
+          }

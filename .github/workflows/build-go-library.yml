@@ -1,0 +1,56 @@
+name: Build a Go library
+on:
+  workflow_call:
+    outputs:
+      new-version:
+        description: "The new library version"
+        value: ${{ jobs.build.outputs.service-version }}
+
+jobs:
+  build:
+    runs-on:
+      group: builder
+    outputs:
+      service-version: ${{ steps.version.outputs.new_version }}
+    steps:
+      - uses: chirpwireless/reusable-github-actions/.github/actions/set-home@main
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: 'go.sum'
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
+          private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+      - name: Configure Git to use installation token
+        run: |
+          git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+          printf "${{ secrets.GITLAB_NETRC }}" > "${HOME}/.netrc"
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.59
+      - name: Install dependencies
+        run: make install
+      - name: Run build
+        run: make build
+      - name: Run tests
+        run: make test
+      - name: Generate Version
+        id: version
+        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
+
+  publish-release:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on:
+      group: builder
+    needs: [ build ]
+    steps:
+      - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
+        with:
+          version: ${{ needs.build.outputs.service-version }}
