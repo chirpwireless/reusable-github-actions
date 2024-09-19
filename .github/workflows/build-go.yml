@@ -21,11 +21,12 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: builder
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
-      - uses: chirpwireless/reusable-github-actions/.github/actions/set-home@feature/reusable-workflows-for-go
+      - uses: chirpwireless/reusable-github-actions/.github/actions/set-home@main
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Set up Go
@@ -57,7 +58,7 @@ jobs:
         run: make test
       - name: Generate Version
         id: version
-        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@feature/reusable-workflows-for-go
+        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
@@ -75,7 +76,8 @@ jobs:
 
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: builder
     needs: [ build ]
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
