@@ -8,7 +8,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: builder
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
@@ -41,11 +42,12 @@ jobs:
         run: make test
       - name: Generate Version
         id: version
-        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
+        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@feature/reusable-workflow-for-go
 
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: builder
     needs: [ build ]
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
