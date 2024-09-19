@@ -35,7 +35,7 @@ jobs:
       - name: Configure Git to use installation token
         run: |
           git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
-          printf "${{ secrets.GITLAB_NETRC }}" > ~/.netrc"
+          printf "${{ secrets.GITLAB_NETRC }}" > "${HOME}/.netrc"
       - name: Run linter
         uses: golangci/golangci-lint-action@v6
         with:
