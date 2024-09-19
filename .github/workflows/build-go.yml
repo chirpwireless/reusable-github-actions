@@ -20,7 +20,7 @@ on:
         value: ${{ jobs.build.outputs.service-version }}
 
 env:
-  HOME: ${{runner.temp}}/${{github.repository}}
+  HOME: ${{github.workspace}}
 
 jobs:
   build:
