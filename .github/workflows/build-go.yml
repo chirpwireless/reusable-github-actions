@@ -26,6 +26,7 @@ jobs:
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
+      - uses: chirpwireless/reusable-github-actions/.github/actions/set-home@main
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Set up Go
