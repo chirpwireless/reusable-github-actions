@@ -13,12 +13,7 @@ jobs:
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
-      - name: Set up unique HOME directory
-        run: |
-          export HOME="$RUNNER_TEMP/home_$GITHUB_RUN_ID"
-          mkdir -p "$HOME"
-          echo "HOME=$HOME" >> $GITHUB_ENV
-          echo $HOME
+      - uses: chirpwireless/reusable-github-actions/.github/actions/set-home@feature/reusable-workflows-for-go
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Set up Go
