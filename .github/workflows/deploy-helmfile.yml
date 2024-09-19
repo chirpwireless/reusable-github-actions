@@ -23,8 +23,7 @@ jobs:
       name: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4.2.0
-      - uses: helmfile/helmfile-action@v1.0.0
+      - uses: helmfile/helmfile-action@v1.9.1
         env:
           VERSION: ${{ inputs.version }}
         with:
