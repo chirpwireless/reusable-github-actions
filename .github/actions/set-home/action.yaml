@@ -6,7 +6,7 @@ runs:
   steps:
     - name: Set up unique HOME directory
       run: |
-        export HOME="$RUNNER_TEMP"
+        export HOME="$RUNNER_TEMP/$GITHUB_REPOSITORY"
         mkdir -p "$HOME"
         echo "HOME=$HOME" >> $GITHUB_ENV
         echo "Setting $HOME as the home dir"
