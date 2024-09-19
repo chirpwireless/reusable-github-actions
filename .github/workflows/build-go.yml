@@ -19,9 +19,6 @@ on:
         description: "The new service version"
         value: ${{ jobs.build.outputs.service-version }}
 
-env:
-  HOME: ${{github.workspace}}
-
 jobs:
   build:
     runs-on:
