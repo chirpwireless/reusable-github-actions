@@ -18,10 +18,10 @@ on:
 jobs:
   deploy:
     container:
-      image: registry.gitlab.com/chirpwireless/infra/images/deployer:main-latest
-      credentials:
-        username: ${{ secrets.GITLAB_CI_USERNAME }}
-        password: ${{ secrets.GITLAB_CI_PASSWORD }}
+      image: ghcr.io/chirpwireless/docker/actions-deployer-runner-image:feature-initial-eeaa612
+#      credentials:
+#        username: ${{ secrets.GITLAB_CI_USERNAME }}
+#        password: ${{ secrets.GITLAB_CI_PASSWORD }}
     runs-on:
       group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
     environment:
