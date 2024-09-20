@@ -16,26 +16,12 @@ on:
         description: "Path to the helm charts"
         type: string
 jobs:
-  generate_token:
-    runs-on:
-      group: builder
-    outputs:
-      token: ${{steps.app-token.outputs.token}}
-    steps:
-      - uses: actions/create-github-app-token@v1
-        id: app-token
-        with:
-          app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
-          private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-
   deploy:
-    needs: generate_token
     container:
       image: ghcr.io/chirpwireless/docker/actions-deployer-runner-image:feature-initial-eeaa612
       credentials:
-        username: x-access-token
-        password: ${{ needs.generate_token.outputs.token }}
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
     runs-on:
       group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
     environment:
