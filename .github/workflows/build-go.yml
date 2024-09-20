@@ -24,8 +24,6 @@ env:
 
 jobs:
   build:
-    container:
-      image: docker:24.0.5-dind
     runs-on:
       group: builder
     outputs:
