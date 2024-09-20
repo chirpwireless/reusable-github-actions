@@ -24,6 +24,8 @@ env:
 
 jobs:
   build:
+    container:
+      image: alpine:3.20.1
     runs-on:
       group: builder
     outputs:

@@ -17,6 +17,8 @@ on:
         type: string
 jobs:
   deploy:
+    container:
+      image: alpine:3.20.1
     runs-on:
       group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
     environment:
