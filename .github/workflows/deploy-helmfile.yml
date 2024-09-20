@@ -17,7 +17,7 @@ on:
         type: string
 
 env:
-  HOME: ${{github.workspace}}
+  HOME: /home/runner
 
 jobs:
   deploy:
