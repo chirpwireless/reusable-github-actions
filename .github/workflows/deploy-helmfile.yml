@@ -23,6 +23,7 @@ jobs:
   deploy:
     container:
       image: ghcr.io/chirpwireless/docker/actions-deployer-runner-image:feature-initial-eeaa612
+      options: --user root
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
