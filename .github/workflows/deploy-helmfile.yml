@@ -33,14 +33,8 @@ jobs:
       name: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
-      - uses: helmfile/helmfile-action@v1.9.1
-        env:
-          VERSION: ${{ inputs.version }}
-        with:
-          helmfile-workdirectory: ${{ inputs.deploy_dir }}
-          helmfile-args: apply --environment ${{ inputs.environment }}
       - name: Deploy using helmfile
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          cd ${{ inputs.deploy_dir }} && ../helmfile -e ${{inputs.environment}} -n namespace apply
+          cd ${{ inputs.deploy_dir }} && helmfile -e ${{inputs.environment}} -n namespace apply
