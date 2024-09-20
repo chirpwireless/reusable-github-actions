@@ -25,7 +25,7 @@ on:
 jobs:
   build:
     container:
-      image: ubuntu:focal-20240530
+      image: ghcr.io/actions-runner-controller/actions-runner-controller/actions-runner-dind:v2.319.1-ubuntu-20.04-1be410b
     runs-on:
       group: gke-non-prod
     outputs:
