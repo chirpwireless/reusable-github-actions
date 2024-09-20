@@ -18,7 +18,7 @@ on:
 jobs:
   deploy:
     container:
-      image: ghcr.io/actions-runner-controller/actions-runner-controller/actions-runner-dind:v2.319.1-ubuntu-20.04-1be410b
+      image: docker:24.0.5-dind
     runs-on:
       group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
     environment:
