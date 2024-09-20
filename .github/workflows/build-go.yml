@@ -36,11 +36,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-#      - name: Set up Go
-#        uses: actions/setup-go@v5
-#        with:
-#          go-version-file: '${{ inputs.app_dir }}/go.mod'
-#          cache-dependency-path: '${{ inputs.app_dir }}/go.sum'
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: '${{ inputs.app_dir }}/go.mod'
+          cache-dependency-path: '${{ inputs.app_dir }}/go.sum'
       - uses: actions/create-github-app-token@v1
         id: app-token
         with:
