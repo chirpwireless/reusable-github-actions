@@ -20,8 +20,8 @@ jobs:
     container:
       image: ghcr.io/chirpwireless/docker/actions-deployer-runner-image:feature-initial-eeaa612
       credentials:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     runs-on:
       group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
     environment:
