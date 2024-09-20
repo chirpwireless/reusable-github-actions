@@ -15,6 +15,10 @@ on:
         required: true
         description: "Path to the helm charts"
         type: string
+
+env:
+  HOME: ${{github.workspace}}
+
 jobs:
   deploy:
     container:

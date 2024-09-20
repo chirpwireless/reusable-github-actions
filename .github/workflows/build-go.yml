@@ -24,11 +24,6 @@ env:
 
 jobs:
   build:
-#    container:
-#      image: registry.gitlab.com/chirpwireless/infra/images/builder:main-latest
-#      credentials:
-#        username: ${{ secrets.GITLAB_CI_USERNAME }}
-#        password: ${{ secrets.GITLAB_CI_PASSWORD }}
     runs-on:
       group: builder
     outputs:
