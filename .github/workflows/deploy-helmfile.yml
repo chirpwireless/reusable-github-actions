@@ -18,7 +18,10 @@ on:
 jobs:
   deploy:
     container:
-      image: docker:24.0.5-dind
+      image: registry.gitlab.com/chirpwireless/infra/images/deployer:main-latest
+      credentials:
+        username: ${{ secrets.GITLAB_CI_USERNAME }}
+        password: ${{ secrets.GITLAB_CI_PASSWORD }}
     runs-on:
       group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
     environment:

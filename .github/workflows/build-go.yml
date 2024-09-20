@@ -25,7 +25,10 @@ on:
 jobs:
   build:
     container:
-      image: ghcr.io/actions-runner-controller/actions-runner-controller/actions-runner-dind:v2.319.1-ubuntu-20.04-1be410b
+      image: registry.gitlab.com/chirpwireless/infra/images/builder:main-latest
+      credentials:
+        username: ${{ secrets.GITLAB_CI_USERNAME }}
+        password: ${{ secrets.GITLAB_CI_PASSWORD }}
     runs-on:
       group: gke-non-prod
     outputs:
@@ -81,7 +84,7 @@ jobs:
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
-      group: builder
+      group: gke-non-prod
     needs: [ build ]
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
