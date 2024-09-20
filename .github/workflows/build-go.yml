@@ -19,18 +19,18 @@ on:
         description: "The new service version"
         value: ${{ jobs.build.outputs.service-version }}
 
-# env:
-#   HOME: ${{github.workspace}}
+env:
+   HOME: ${{github.workspace}}
 
 jobs:
   build:
-    container:
-      image: registry.gitlab.com/chirpwireless/infra/images/builder:main-latest
-      credentials:
-        username: ${{ secrets.GITLAB_CI_USERNAME }}
-        password: ${{ secrets.GITLAB_CI_PASSWORD }}
+#    container:
+#      image: registry.gitlab.com/chirpwireless/infra/images/builder:main-latest
+#      credentials:
+#        username: ${{ secrets.GITLAB_CI_USERNAME }}
+#        password: ${{ secrets.GITLAB_CI_PASSWORD }}
     runs-on:
-      group: gke-non-prod
+      group: builder
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
