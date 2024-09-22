@@ -93,7 +93,7 @@ jobs:
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
-      group: gke-non-prod
+      group: builder
     needs: [ build ]
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
