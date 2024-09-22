@@ -33,16 +33,16 @@ jobs:
         run: |
           git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
           printf "${{ secrets.GITLAB_NETRC }}" > "${HOME}/.netrc"
-      - name: Run linter
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.59
       - name: Install dependencies
         run: make install
       - name: Run build
         run: make build
       - name: Run tests
         run: make test
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.59
       - name: Generate Version
         id: version
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main

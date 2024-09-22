@@ -46,18 +46,18 @@ jobs:
         run: |
           git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
           printf "${{ secrets.GITLAB_NETRC }}" > ~/.netrc
-      - name: Run linter
-        uses: golangci/golangci-lint-action@v6
-        if: ${{ inputs.skip_linter == false }}
-        with:
-          version: v1.59
-          working-directory: ${{ inputs.app_dir }}
       - name: Install dependencies
         run: make install
       - name: Run build
         run: make build
       - name: Run tests
         run: make test
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v6
+        if: ${{ inputs.skip_linter == false }}
+        with:
+          version: v1.59
+          working-directory: ${{ inputs.app_dir }}
       - name: Generate Version
         id: version
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
