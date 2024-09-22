@@ -66,12 +66,28 @@ jobs:
         run: make build
       - name: Run tests
         run: |
-          go test -json -v ./... -cover -coverprofile=coverage.txt | gotestfmt
-      - name: Archive code coverage results
-        uses: actions/upload-artifact@v4
+          go install github.com/t-yuki/gocover-cobertura
+          cd ${{ inputs.app_dir}} && go test -json -v ./... -cover -coverprofile=coverage.txt | gotestfmt
+          gocover-cobertura < coverage.txt > coverage.xml
+      - name: Generate code coverage report
+        uses: irongut/CodeCoverageSummary@v1.3.0
         with:
-          name: ${{ env.CODE_COVERAGE_ARTIFACT }}
-          path: coverage.txt
+          filename: coverage.xml
+          badge: false
+          fail_below_min: false
+          format: markdown
+          hide_branch_rate: false
+          hide_complexity: true
+          indicators: true
+          output: both
+          thresholds: '60 80'
+
+      - name: Add Coverage PR Comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: github.event_name == 'pull_request'
+        with:
+          recreate: true
+          path: code-coverage-results.md
       - name: Run linter
         uses: golangci/golangci-lint-action@v6
         if: ${{ inputs.skip_linter == false }}
@@ -95,17 +111,6 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ steps.version.outputs.new_version }}
-
-  code_coverage:
-    name: "Code coverage report"
-    if: github.event_name == 'pull_request' # Do not run when workflow is triggered by push to main branch
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - uses: fgrosse/go-coverage-report@v1.1.1
-        with:
-          coverage-artifact-name: ${{ env.CODE_COVERAGE_ARTIFACT }}
-          coverage-file-name: "coverage.txt"
 
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
