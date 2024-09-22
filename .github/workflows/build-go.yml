@@ -66,28 +66,7 @@ jobs:
         run: make build
       - name: Run tests
         run: |
-          go install github.com/t-yuki/gocover-cobertura
           cd ${{ inputs.app_dir}} && go test -json -v ./... -cover -coverprofile=coverage.txt | gotestfmt
-          gocover-cobertura < coverage.txt > coverage.xml
-      - name: Generate code coverage report
-        uses: irongut/CodeCoverageSummary@v1.3.0
-        with:
-          filename: coverage.xml
-          badge: false
-          fail_below_min: false
-          format: markdown
-          hide_branch_rate: false
-          hide_complexity: true
-          indicators: true
-          output: both
-          thresholds: '60 80'
-
-      - name: Add Coverage PR Comment
-        uses: marocchino/sticky-pull-request-comment@v2
-        if: github.event_name == 'pull_request'
-        with:
-          recreate: true
-          path: code-coverage-results.md
       - name: Run linter
         uses: golangci/golangci-lint-action@v6
         if: ${{ inputs.skip_linter == false }}
