@@ -25,7 +25,6 @@ on:
 
 env:
    HOME: ${{github.workspace}}
-   CODE_COVERAGE_ARTIFACT: 'code-coverage'
 
 jobs:
   build:
