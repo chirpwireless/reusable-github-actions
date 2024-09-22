@@ -57,7 +57,7 @@ jobs:
         run: make build
       - name: Run tests
         run: |
-          go test -json -v ./... -cover -coverprofile=coverage.txt
+          go test -json -v ./... -cover -coverprofile=coverage.txt | gotestfmt
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4
         with:
