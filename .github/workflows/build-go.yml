@@ -14,6 +14,10 @@ on:
         description: "A boolean flag to skip linter checks"
         type: boolean
         default: false
+      generate_docs:
+        description: "A boolean flag to generate Swagger docs"
+        type: boolean
+        default: false
     outputs:
       new-version:
         description: "The new service version"
@@ -36,6 +40,10 @@ jobs:
         with:
           go-version-file: '${{ inputs.app_dir }}/go.mod'
           cache-dependency-path: '${{ inputs.app_dir }}/go.sum'
+      - name: Set up gotestfmt
+        uses: GoTestTools/gotestfmt-action@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/create-github-app-token@v1
         id: app-token
         with:
@@ -46,12 +54,18 @@ jobs:
         run: |
           git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
           printf "${{ secrets.GITLAB_NETRC }}" > ~/.netrc
+      - name: Generate swagger docs
+        if: ${{ inputs.generate_docs == true }}
+        run: |
+          go install github.com/swaggo/swag/cmd/swag@latest
+          make swagger
       - name: Install dependencies
         run: make install
       - name: Run build
         run: make build
       - name: Run tests
-        run: make test
+        run: |
+          cd ${{ inputs.app_dir}} && go test -json -v ./... -cover -coverprofile=coverage.txt | gotestfmt
       - name: Run linter
         uses: golangci/golangci-lint-action@v6
         if: ${{ inputs.skip_linter == false }}
