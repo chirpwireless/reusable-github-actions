@@ -22,7 +22,7 @@ env:
 jobs:
   deploy:
     container:
-      image: ghcr.io/chirpwireless/docker/actions-deployer-runner-image:feature-initial-eeaa612
+      image: ghcr.io/chirpwireless/docker/actions-deployer-runner-image:feature-initial-1a9d3f5
       options: --user root
       credentials:
         username: ${{ github.actor }}
