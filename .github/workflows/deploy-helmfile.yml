@@ -37,4 +37,4 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          cd ${{ inputs.deploy_dir }} && helmfile -e ${{inputs.environment}} -n namespace apply
+          cd ${{ inputs.deploy_dir }} && helmfile -e ${{inputs.environment}} -n ${{inputs.environment}} apply
