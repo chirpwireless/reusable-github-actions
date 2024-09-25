@@ -1,0 +1,34 @@
+name: Deploy a microservice using helmfile
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        description: "Version to be deployed"
+        type: string
+      environment:
+        required: true
+        description: "Environment (k8s namespace)"
+        type: string
+      deploy_dir:
+        required: true
+        description: "Path to the helm charts"
+        type: string
+
+env:
+  HOME: /home/runner
+
+jobs:
+  deploy:
+    runs-on:
+      group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy using helmfile
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          cd ${{ inputs.deploy_dir }} && helmfile -e ${{inputs.environment}} -n ${{inputs.environment}} apply

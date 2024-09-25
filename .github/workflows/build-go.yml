@@ -14,19 +14,25 @@ on:
         description: "A boolean flag to skip linter checks"
         type: boolean
         default: false
+      generate_docs:
+        description: "A boolean flag to generate Swagger docs"
+        type: boolean
+        default: false
     outputs:
       new-version:
         description: "The new service version"
         value: ${{ jobs.build.outputs.service-version }}
 
+env:
+   HOME: ${{github.workspace}}
+
 jobs:
   build:
     runs-on:
-      group: builder
+      group: gke-non-prod
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
-      - uses: chirpwireless/reusable-github-actions/.github/actions/set-home@main
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Set up Go
@@ -34,6 +40,10 @@ jobs:
         with:
           go-version-file: '${{ inputs.app_dir }}/go.mod'
           cache-dependency-path: '${{ inputs.app_dir }}/go.sum'
+      - name: Set up gotestfmt
+        uses: GoTestTools/gotestfmt-action@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/create-github-app-token@v1
         id: app-token
         with:
@@ -44,18 +54,25 @@ jobs:
         run: |
           git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
           printf "${{ secrets.GITLAB_NETRC }}" > ~/.netrc
+      - name: Generate swagger docs
+        if: ${{ inputs.generate_docs == true }}
+        run: |
+          go get -u github.com/swaggo/swag/cmd/swag
+          go install github.com/swaggo/swag/cmd/swag
+          make swagger
+      - name: Install dependencies
+        run: make install
+      - name: Run build
+        run: make build
+      - name: Run tests
+        run: |
+          cd ${{ inputs.app_dir}} && go test -json -v ./... -cover -coverprofile=coverage.txt | gotestfmt
       - name: Run linter
         uses: golangci/golangci-lint-action@v6
         if: ${{ inputs.skip_linter == false }}
         with:
           version: v1.59
           working-directory: ${{ inputs.app_dir }}
-      - name: Install dependencies
-        run: make install
-      - name: Run build
-        run: make build
-      - name: Run tests
-        run: make test
       - name: Generate Version
         id: version
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
@@ -77,7 +94,7 @@ jobs:
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
-      group: builder
+      group: gke-non-prod
     needs: [ build ]
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
