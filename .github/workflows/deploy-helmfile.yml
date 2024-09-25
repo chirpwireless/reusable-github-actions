@@ -21,12 +21,6 @@ env:
 
 jobs:
   deploy:
-    container:
-      image: ghcr.io/chirpwireless/docker/actions-deployer-runner-image:feature-initial-1a9d3f5
-      options: --user root
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
     runs-on:
       group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
     environment:
