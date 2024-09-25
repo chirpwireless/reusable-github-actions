@@ -28,8 +28,7 @@ env:
 
 jobs:
   build:
-    runs-on:
-      group: builder
+    runs-on: ubuntu-latest
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
