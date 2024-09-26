@@ -31,6 +31,9 @@ jobs:
       name: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
+      - name: "Create a summary"
+        run: |
+          echo "Deploying the version ${{inputs.version}} :fast_forward:" > $GITHUB_STEP_SUMMARY
       - uses: azure/setup-helm@v4.2.0
       - name: Helm upgrade
         shell: sh
