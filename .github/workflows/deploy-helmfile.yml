@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: "Create a summary"
         run: |
-          echo "Deploying the version ${{inputs.version}} > $GITHUB_STEP_SUMMARY
+          echo "Deploying the version ${{inputs.version}}" > $GITHUB_STEP_SUMMARY
       - name: Deploy using helmfile
         env:
           VERSION: ${{ inputs.version }}

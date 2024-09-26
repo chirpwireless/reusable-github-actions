@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: "Create a summary"
         run: |
-          echo "Deploying the version ${{inputs.version}} > $GITHUB_STEP_SUMMARY
+          echo "Deploying the version ${{inputs.version}}" > $GITHUB_STEP_SUMMARY
       - uses: azure/setup-helm@v4.2.0
       - name: Helm upgrade
         shell: sh
