@@ -24,17 +24,22 @@ on:
         description: "Path to the values file"
         type: string
 jobs:
+  announce_deployment:
+    runs-on:
+      group: gke-non-prod
+    steps:
+      - run: |
+          echo "Deploying the version ${{inputs.version}}" > $GITHUB_STEP_SUMMARY
+
   deploy:
     name: "Deploy to ${{inputs.environment}}"
+    needs: announce_deployment
     runs-on:
       group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
     environment:
       name: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
-      - name: "Create a summary"
-        run: |
-          echo "Deploying the version ${{inputs.version}}" > $GITHUB_STEP_SUMMARY
       - uses: azure/setup-helm@v4.2.0
       - name: Helm upgrade
         shell: sh
