@@ -30,9 +30,6 @@ jobs:
   generate-version:
     runs-on:
       group: gke-non-prod
-    permissions:
-      contents: read
-      checks: write
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
