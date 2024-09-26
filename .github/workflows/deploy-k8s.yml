@@ -25,7 +25,7 @@ on:
         type: string
 jobs:
   deploy:
-    name: "Deploy ${{inputs.version}} to ${{inputs.environment}}"
+    name: "Deploy to ${{inputs.environment}}"
     runs-on:
       group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
     environment:
