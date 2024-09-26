@@ -38,7 +38,7 @@ jobs:
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
       - name: "Create a summary"
         run: |
-          echo "Building a new revision ${{steps.version.outputs.new_version}} :fast_forward:" > $GITHUB_STEP_SUMMARY
+          echo "Building a new revision ${{steps.version.outputs.new_version}} > $GITHUB_STEP_SUMMARY
 
   build:
     runs-on:
