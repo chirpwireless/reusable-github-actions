@@ -20,7 +20,16 @@ env:
   HOME: /home/runner
 
 jobs:
+  announce_deployment:
+    runs-on:
+      group: gke-non-prod
+    steps:
+      - run: |
+          echo "Deploying the version ${{inputs.version}}" > $GITHUB_STEP_SUMMARY
+
   deploy:
+    name: "Deploy to ${{inputs.environment}}"
+    needs: announce_deployment
     runs-on:
       group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
     environment:
