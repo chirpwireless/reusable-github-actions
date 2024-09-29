@@ -57,7 +57,7 @@ async function fetchVersionFromCheck({ github, context, core }) {
         return undefined;
     }
 
-    const versionCheck = res.data.check_runs[0];
+    const versionCheck = res.data.check_runs.find(it => it.name === CHECK_NAME);
     core.info(`VERSION CHECK: ${JSON.stringify(versionCheck)}`);
 
     const version = versionCheck.output.title;
