@@ -100,6 +100,19 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
 
+  publish-version:
+    name: 'Publish: Version'
+    runs-on: [ self-hosted, size-xs ]
+    needs: [ generate-version, build ]
+    permissions:
+      checks: write
+    steps:
+      - name: Publish Version
+        uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@feature/deploy-from-latest
+        with:
+          commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          build-version: ${{ needs.generate-version.outputs.service-version }}
+
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
