@@ -11,34 +11,6 @@ async function fetchRelease({github, context, core}) {
     return res.data.tag_name;
 }
 
-async function fetchVersionFromCommitStatus({github, context, core}) {
-    try {
-        const {GIT_REF, CHECK_NAME} = process.env;
-        const repo = context.repo.repo;
-
-        const commitStatuses = await github.rest.repos.listCommitStatusesForRef({
-            owner: context.repo.owner,
-            repo,
-            ref: GIT_REF,
-            per_page: 100
-        });
-        core.debug(`STATUSES: ${JSON.stringify(commitStatuses.data)}`);
-
-        for (const status of commitStatuses.data) {
-            if (status.context === CHECK_NAME) {
-                core.info(`VERSION: ${status.description}`);
-                return status.description;
-            }
-        }
-
-        return undefined
-    } catch (e) {
-        core.warning(`Failed to fetch commit statuses: ${e.message}, falling back to the checks API. If the error says 'Resource not accessible by integration', Please add statuses: write permission to the workflow to remove this warning.`);
-        return undefined
-    }
-}
-
-
 async function fetchVersionFromCheck({github, context, core}) {
     const {GIT_REF, CHECK_NAME} = process.env;
     const repo = context.repo.repo;
@@ -88,12 +60,6 @@ exports.fetchVersion = async ({github, context, core}) => {
     const {GIT_REF, CHECK_NAME} = process.env;
     core.info(`Fetching version for git sha '${GIT_REF}' ('${CHECK_NAME}') ...`);
 
-    const versionFromStatus = await fetchVersionFromCommitStatus({github, context, core});
-    if (versionFromStatus) {
-        return versionFromStatus;
-    }
-    core.warning(`No version found in commit statuses, falling back to checks`);
-
     const versionFromCheck = await fetchVersionFromCheck({github, context, core});
     if (versionFromCheck) {
         return versionFromCheck;
@@ -104,6 +70,6 @@ exports.fetchVersion = async ({github, context, core}) => {
         return versionFromRelease
     }
 
-    core.setFailed(`No version found for git sha '${GIT_REF}' ('${CHECK_NAME}') in either commit statuses, checks or releases.`);
+    core.setFailed(`No version found for git sha '${GIT_REF}' ('${CHECK_NAME}') in either checks or releases.`);
     return '';
 };
