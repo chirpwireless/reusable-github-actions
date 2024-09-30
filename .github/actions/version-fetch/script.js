@@ -69,20 +69,19 @@ async function fetchVersionFromCheck({github, context, core}) {
 }
 
 exports.fetchRef = async ({github, context, core}) => {
-    const gitRef = core.getInput('git-ref')
+    const {GIT_REF, GITHUB_REF_NAME} = process.env;
 
-    if (gitRef) {
-        core.info(`git ref is defined as ${gitRef}`)
-        return gitRef
+    if (GIT_REF) {
+        core.info(`git ref is defined as ${GIT_REF}`)
+        return GIT_REF
     }
 
-    const currentRef = process.env.GITHUB_REF_NAME
-    if (currentRef === 'main' || currentRef === 'master') {
+    if (GITHUB_REF_NAME === 'main' || GITHUB_REF_NAME === 'master') {
         core.info(`Branch is main or master, but version is not defined. Defaulting to the last release`)
         return fetchRelease({github, context, core})
     }
-    core.info(`Using ${currentRef} as the git ref`)
-    return currentRef
+    core.info(`Using ${GITHUB_REF_NAME} as the git ref`)
+    return GITHUB_REF_NAME
 };
 
 exports.fetchVersion = async ({github, context, core}) => {
