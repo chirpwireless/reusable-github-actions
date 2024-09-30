@@ -4,8 +4,9 @@ on:
   workflow_call:
     inputs:
       version:
-        description: "Git reference (branch, tag or SHA) of commit to deploy"
+        description: "Version to be deployed"
         type: string
+        default: ${{github.ref_name}}
       environment:
         required: true
         description: "Environment (k8s namespace)"
@@ -19,22 +20,16 @@ env:
   HOME: /home/runner
 
 jobs:
-  fetch_version:
+  announce_deployment:
     runs-on:
       group: gke-non-prod
-    outputs:
-      version: ${{steps.fetch-version.outputs.version}}
     steps:
-      - id: fetch-version
-        uses: chirpwireless/reusable-github-actions/.github/actions/version-fetch@feature/deploy-from-latest
-        with:
-          git-ref: ${{ inputs.version }}
       - run: |
-          echo "Deploying the version ${{steps.fetch-version.outputs.version}}" > $GITHUB_STEP_SUMMARY
+          echo "Deploying the version ${{inputs.version}}" > $GITHUB_STEP_SUMMARY
 
   deploy:
     name: "Deploy to ${{inputs.environment}}"
-    needs: fetch_version
+    needs: announce_deployment
     runs-on:
       group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
     environment:
@@ -43,6 +38,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Deploy using helmfile
         env:
-          VERSION: ${{ needs.fetch_version.outputs.version }}
+          VERSION: ${{ inputs.version }}
         run: |
           cd ${{ inputs.deploy_dir }} && helmfile -e ${{inputs.environment}} -n ${{inputs.environment}} apply
