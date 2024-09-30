@@ -26,7 +26,7 @@ jobs:
       version: ${{steps.fetch-version.outputs.version}}
     steps:
       - id: fetch-version
-        uses: chirpwireless/reusable-github-actions/.github/actions/version-fetch@feature/deploy-from-latest
+        uses: chirpwireless/reusable-github-actions/.github/actions/version-fetch@main
         with:
           git-ref: ${{ inputs.version }}
       - run: |

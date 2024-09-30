@@ -108,7 +108,7 @@ jobs:
       checks: write
     steps:
       - name: Publish Version
-        uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@feature/deploy-from-latest
+        uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
           build-version: ${{ needs.generate-version.outputs.service-version }}
