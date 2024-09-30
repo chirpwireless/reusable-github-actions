@@ -1,5 +1,5 @@
 name: 'Fetch Version'
-description: 'Fetches published build version from a git ref. By default will fetch latest release.'
+description: 'Fetches published build version from a git ref. By default, it takes the last build or release version depending on the branch.'
 
 inputs:
   git-ref:
@@ -33,7 +33,6 @@ runs:
         script: |
           const { fetchRef } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
           return fetchRef({ github, context, core });
-
     - id: fetch-version
       uses: actions/github-script@v7
       env:
@@ -45,7 +44,6 @@ runs:
         script: |
           const { fetchVersion } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
           return fetchVersion({ github, context, core });
-
     - id: log-output
       shell: bash
       run: echo ${{ steps.fetch-version.outputs.result }}
