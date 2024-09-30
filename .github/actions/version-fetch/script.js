@@ -1,6 +1,22 @@
-exports.fetchRelease = async ({ github, context, core }) => {
-    const { REPO } = process.env;
-    const repo = REPO || context.repo.repo;
+exports.fetchRef = async ({github, context, core}) => {
+    const gitRef = core.getInput('get-ref')
+
+    if (gitRef) {
+        core.info(`git ref is defined as ${gitRef}`)
+        return gitRef
+    }
+
+    const currentRef = process.env.GITHUB_REF_NAME
+    if (currentRef === 'main' || currentRef === 'master') {
+        core.info(`Branch is main or master, but version is not defined. Defaulting to the last release`)
+        return fetchRelease({github, context, core})
+    }
+    core.info(`Using ${currentRef} as the git ref`)
+    return currentRef
+};
+
+async function fetchRelease({github, context, core}) {
+    const repo = context.repo.repo;
     core.info(`Fetching version from latest release in ${repo}...`);
 
     const res = await github.rest.repos.getLatestRelease({
@@ -10,12 +26,12 @@ exports.fetchRelease = async ({ github, context, core }) => {
     core.info(`RELEASE: ${JSON.stringify(res.data)}`);
 
     return res.data.tag_name;
-};
+}
 
-async function fetchVersionFromCommitStatus({ github, context, core }) {
+async function fetchVersionFromCommitStatus({github, context, core}) {
     try {
-        const { REPO, GIT_REF, CHECK_NAME } = process.env;
-        const repo = REPO || context.repo.repo;
+        const {GIT_REF, CHECK_NAME} = process.env;
+        const repo = context.repo.repo;
 
         const commitStatuses = await github.rest.repos.listCommitStatusesForRef({
             owner: context.repo.owner,
@@ -40,9 +56,9 @@ async function fetchVersionFromCommitStatus({ github, context, core }) {
 }
 
 
-async function fetchVersionFromCheck({ github, context, core }) {
-    const { REPO, GIT_REF, CHECK_NAME } = process.env;
-    const repo = REPO || context.repo.repo;
+async function fetchVersionFromCheck({github, context, core}) {
+    const {GIT_REF, CHECK_NAME} = process.env;
+    const repo = context.repo.repo;
 
     const res = await github.rest.checks.listForRef({
         owner: context.repo.owner,
@@ -69,21 +85,21 @@ async function fetchVersionFromCheck({ github, context, core }) {
     return version;
 }
 
-exports.fetchVersion = async ({ github, context, core }) => {
-    const { GIT_REF, CHECK_NAME, DEFAULT_VALUE } = process.env;
+exports.fetchVersion = async ({github, context, core}) => {
+    const {GIT_REF, CHECK_NAME} = process.env;
     core.info(`Fetching version for git sha '${GIT_REF}' ('${CHECK_NAME}') ...`);
 
-    const versionFromStatus = await fetchVersionFromCommitStatus({ github, context, core });
+    const versionFromStatus = await fetchVersionFromCommitStatus({github, context, core});
     if (versionFromStatus) {
         return versionFromStatus;
     }
     core.warning(`No version found in commit statuses, falling back to checks`);
 
-    const versionFromCheck = await fetchVersionFromCheck({ github, context, core });
+    const versionFromCheck = await fetchVersionFromCheck({github, context, core});
     if (versionFromCheck) {
         return versionFromCheck;
     }
 
     core.setFailed(`No version found for git sha '${GIT_REF}' ('${CHECK_NAME}') in either commit statuses or checks.`);
-    return DEFAULT_VALUE;
+    return '';
 };

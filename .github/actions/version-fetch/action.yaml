@@ -2,10 +2,6 @@ name: 'Fetch Version'
 description: 'Fetches published build version from a git ref. By default will fetch latest release.'
 
 inputs:
-  repository:
-    description: 'Repository to fetch build version from'
-    required: false
-    default: ''
   git-ref:
     description: 'Git ref (branch, tag or SHA) to fetch build version'
     required: false
@@ -18,10 +14,6 @@ inputs:
     description: 'The GitHub token'
     required: true
     default: ${{ github.token }}
-  default-value:
-    description: 'Default value to use if version cannot be fetched. Returned when `continue-on-error` is enabled.'
-    required: false
-    default: ''
 
 outputs:
   version:
@@ -34,7 +26,7 @@ runs:
     - id: fetch-git-ref
       shell: bash
       run: |
-        if [ -z "${{ inputs.version }}" ]; then
+        if [ -z "${{ inputs.git-ref }}" ]; then
           if [[ "${{ github.ref_name }}" != "main" && "${{ github.ref_name }}" != "master" ]]; then
             echo "Using github.ref_name: ${{ github.ref_name }}"
             echo "::set-output name=git-ref::${{ github.ref_name }}"
@@ -46,25 +38,20 @@ runs:
           echo "Version is defined: ${{ inputs.version }}"
           echo "::set-output name=git-ref::${{ inputs.version }}"
         fi
-    - id: fetch-release
-      if: ${{ steps.fetch-git-ref.outputs.git-ref == '' }}
+    - id: fetch-ref
       uses: actions/github-script@v7
-      env:
-        REPO: ${{ inputs.repository }}
       with:
         result-encoding: string
         github-token: ${{ inputs.github-token }}
         script: |
-          const { fetchRelease } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
-          return fetchRelease({ github, context, core });
+          const { fetchRef } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
+          return fetchRef({ github, context, core });
 
     - id: fetch-version
       uses: actions/github-script@v7
       env:
-        REPO: ${{ inputs.repository }}
-        GIT_REF: ${{ steps.fetch-release.outputs.result || steps.fetch-git-ref.outputs.git-ref }}
+        GIT_REF: ${{ steps.fetch-ref.outputs.result }}
         CHECK_NAME: ${{ inputs.check-name }}
-        DEFAULT_VALUE: ${{ inputs.default-value }}
       with:
         result-encoding: string
         github-token: ${{ inputs.github-token }}
