@@ -23,21 +23,6 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - id: fetch-git-ref
-      shell: bash
-      run: |
-        if [ -z "${{ inputs.git-ref }}" ]; then
-          if [[ "${{ github.ref_name }}" != "main" && "${{ github.ref_name }}" != "master" ]]; then
-            echo "Using github.ref_name: ${{ github.ref_name }}"
-            echo "::set-output name=git-ref::${{ github.ref_name }}"
-          else
-            echo "Branch is main or master, but version not defined. Defaulting to the last value."
-            echo "::set-output name=git-ref::"
-          fi
-        else
-          echo "Version is defined: ${{ inputs.version }}"
-          echo "::set-output name=git-ref::${{ inputs.version }}"
-        fi
     - id: fetch-ref
       uses: actions/github-script@v7
       with:
