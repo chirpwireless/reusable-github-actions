@@ -99,6 +99,11 @@ exports.fetchVersion = async ({github, context, core}) => {
         return versionFromCheck;
     }
 
-    core.setFailed(`No version found for git sha '${GIT_REF}' ('${CHECK_NAME}') in either commit statuses or checks.`);
+    const versionFromRelease = await fetchRelease({github, context, core})
+    if (versionFromRelease) {
+        return versionFromRelease
+    }
+
+    core.setFailed(`No version found for git sha '${GIT_REF}' ('${CHECK_NAME}') in either commit statuses, checks or releases.`);
     return '';
 };
