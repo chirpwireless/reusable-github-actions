@@ -1,0 +1,49 @@
+name: 'Fetch Version'
+description: 'Fetches published build version from a git ref. By default, it takes the last build or release version depending on the branch.'
+
+inputs:
+  git-ref:
+    description: 'Git ref (branch, tag) to fetch build version'
+    required: false
+    default: ''
+  check-name:
+    description: 'The name of the check containing the build version'
+    required: false
+    default: 'chirp:version'
+  github-token:
+    description: 'The GitHub token'
+    required: true
+    default: ${{ github.token }}
+
+outputs:
+  version:
+    description: 'Build version fetched from git ref'
+    value: ${{ steps.fetch-version.outputs.result }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: fetch-ref
+      uses: actions/github-script@v7
+      env:
+        GIT_REF: ${{ inputs.git-ref }}
+      with:
+        result-encoding: string
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const { fetchRef } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
+          return fetchRef({ github, context, core });
+    - id: fetch-version
+      uses: actions/github-script@v7
+      env:
+        GIT_REF: ${{ steps.fetch-ref.outputs.result }}
+        CHECK_NAME: ${{ inputs.check-name }}
+      with:
+        result-encoding: string
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const { fetchVersion } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
+          return fetchVersion({ github, context, core });
+    - id: log-output
+      shell: bash
+      run: echo ${{ steps.fetch-version.outputs.result }}

@@ -8,8 +8,7 @@ on:
         type: string
         required: true
       version:
-        required: true
-        description: "Version to be deployed"
+        description: "Git reference (branch, tag) of commit to deploy"
         type: string
       environment:
         required: true
@@ -24,16 +23,22 @@ on:
         description: "Path to the values file"
         type: string
 jobs:
-  announce_deployment:
+  fetch_version:
     runs-on:
       group: gke-non-prod
+    outputs:
+      version: ${{steps.fetch-version.outputs.version}}
     steps:
+      - id: fetch-version
+        uses: chirpwireless/reusable-github-actions/.github/actions/version-fetch@main
+        with:
+          git-ref: ${{ inputs.version }}
       - run: |
-          echo "Deploying the version ${{inputs.version}}" > $GITHUB_STEP_SUMMARY
+          echo "Deploying the version ${{steps.fetch-version.outputs.version}}" > $GITHUB_STEP_SUMMARY
 
   deploy:
     name: "Deploy to ${{inputs.environment}}"
-    needs: announce_deployment
+    needs: fetch_version
     runs-on:
       group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
     environment:
@@ -44,4 +49,4 @@ jobs:
       - name: Helm upgrade
         shell: sh
         run: |
-          helm upgrade -i ${{ inputs.service_name }} ${{ inputs.deploy_dir }}/${{ inputs.service_name }} --namespace ${{ inputs.environment }} --wait --atomic --set image.tag=${{ inputs.version }} -f ${{ inputs.values_file }}
+          helm upgrade -i ${{ inputs.service_name }} ${{ inputs.deploy_dir }}/${{ inputs.service_name }} --namespace ${{ inputs.environment }} --wait --atomic --set image.tag=${{ needs.fetch_version.outputs.version }} -f ${{ inputs.values_file }}
