@@ -8,9 +8,9 @@ on:
         type: string
         required: true
       version:
-        description: "Version to be deployed"
+        description: "Git reference (branch, tag or SHA) of commit to deploy"
         type: string
-        default: ${{github.ref_name}}
+        required: true
       environment:
         required: true
         description: "Environment (k8s namespace)"
