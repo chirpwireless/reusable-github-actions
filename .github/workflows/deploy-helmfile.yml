@@ -6,7 +6,6 @@ on:
       version:
         description: "Git reference (branch, tag or SHA) of commit to deploy"
         type: string
-        required: true
       environment:
         required: true
         description: "Environment (k8s namespace)"
