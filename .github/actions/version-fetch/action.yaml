@@ -3,7 +3,7 @@ description: 'Fetches published build version from a git ref. By default, it tak
 
 inputs:
   git-ref:
-    description: 'Git ref (branch, tag or SHA) to fetch build version'
+    description: 'Git ref (branch, tag) to fetch build version'
     required: false
     default: ''
   check-name:
