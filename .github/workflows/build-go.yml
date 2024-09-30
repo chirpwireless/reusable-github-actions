@@ -101,7 +101,6 @@ jobs:
           tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
 
   publish-version:
-    name: 'Publish: Version'
     runs-on:
       group: gke-non-prod
     needs: [ generate-version, build ]
