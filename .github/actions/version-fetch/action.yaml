@@ -6,22 +6,18 @@ inputs:
     description: 'Repository to fetch build version from'
     required: false
     default: ''
-
   git-ref:
     description: 'Git ref (branch, tag or SHA) to fetch build version'
     required: false
     default: ''
-
   check-name:
     description: 'The name of the check containing the build version'
     required: false
     default: 'chirp:version'
-
   github-token:
     description: 'The GitHub token'
     required: true
     default: ${{ github.token }}
-
   default-value:
     description: 'Default value to use if version cannot be fetched. Returned when `continue-on-error` is enabled.'
     required: false
