@@ -1,20 +1,3 @@
-exports.fetchRef = async ({github, context, core}) => {
-    const gitRef = core.getInput('get-ref')
-
-    if (gitRef) {
-        core.info(`git ref is defined as ${gitRef}`)
-        return gitRef
-    }
-
-    const currentRef = process.env.GITHUB_REF_NAME
-    if (currentRef === 'main' || currentRef === 'master') {
-        core.info(`Branch is main or master, but version is not defined. Defaulting to the last release`)
-        return fetchRelease({github, context, core})
-    }
-    core.info(`Using ${currentRef} as the git ref`)
-    return currentRef
-};
-
 async function fetchRelease({github, context, core}) {
     const repo = context.repo.repo;
     core.info(`Fetching version from latest release in ${repo}...`);
@@ -84,6 +67,23 @@ async function fetchVersionFromCheck({github, context, core}) {
 
     return version;
 }
+
+exports.fetchRef = async ({github, context, core}) => {
+    const gitRef = core.getInput('git-ref')
+
+    if (gitRef) {
+        core.info(`git ref is defined as ${gitRef}`)
+        return gitRef
+    }
+
+    const currentRef = process.env.GITHUB_REF_NAME
+    if (currentRef === 'main' || currentRef === 'master') {
+        core.info(`Branch is main or master, but version is not defined. Defaulting to the last release`)
+        return fetchRelease({github, context, core})
+    }
+    core.info(`Using ${currentRef} as the git ref`)
+    return currentRef
+};
 
 exports.fetchVersion = async ({github, context, core}) => {
     const {GIT_REF, CHECK_NAME} = process.env;
