@@ -13,7 +13,6 @@ on:
       namespace:
         description: "k8s namespace"
         type: string
-        default: ${{inputs.environment}}
       deploy_dir:
         required: true
         description: "Path to the helm charts"
@@ -49,4 +48,4 @@ jobs:
         env:
           VERSION: ${{ needs.fetch_version.outputs.version }}
         run: |
-          cd ${{ inputs.deploy_dir }} && helmfile -e ${{inputs.environment}} -n ${{inputs.namespace}} apply
+          cd ${{ inputs.deploy_dir }} && helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} apply
