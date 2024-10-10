@@ -50,11 +50,11 @@ jobs:
       - name: Commit and Push Version Change
         if: ${{env.publish == 'true' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           git push --follow-tags
       - name: Publish to NPM
         if: ${{env.publish == 'true' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: yarn publish
