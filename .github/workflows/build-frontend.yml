@@ -44,14 +44,14 @@ jobs:
         shell: bash
         run: |
           npm install -g yarn@1.22.22
-      - name: Cache yarn dependencies
-        uses: actions/cache@v3
-        id: cache-dependencies
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
+#      - name: Cache yarn dependencies
+#        uses: actions/cache@v3
+#        id: cache-dependencies
+#        with:
+#          path: node_modules
+#          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+#          restore-keys: |
+#            ${{ runner.os }}-yarn-
       - name: Install yarn dependencies
         run: yarn install --frozen-lockfile
       - name: Run build
