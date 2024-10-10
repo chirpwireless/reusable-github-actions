@@ -56,5 +56,7 @@ jobs:
       - name: Publish to NPM
         if: ${{env.publish == 'true' }}
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: yarn publish
+          NODE_AUTH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ env.NODE_AUTH_TOKEN }}" > ~/.npmrc
+          yarn publish
