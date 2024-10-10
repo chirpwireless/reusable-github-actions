@@ -10,23 +10,9 @@ env:
   HOME: ${{github.workspace}}
 
 jobs:
-  generate-version:
-    runs-on:
-      group: gke-non-prod
-    outputs:
-      service-version: ${{ steps.version.outputs.new_version }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: version
-        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
-      - name: "Create a summary"
-        run: |
-          echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
-
   build:
     runs-on:
       group: gke-non-prod
-    needs: [ generate-version ]
     env:
       publish: ${{github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'}}
     steps:
