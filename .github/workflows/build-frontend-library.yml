@@ -16,11 +16,17 @@ jobs:
     env:
       publish: ${{github.event_name == 'push' && github.ref == 'refs/heads/dev'}}
     steps:
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
+          private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
       - name: Setup NodeJS
         uses: actions/setup-node@v4
         with:
@@ -44,13 +50,13 @@ jobs:
       - name: Commit and Push Version Change
         if: ${{env.publish == 'true' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           git push --follow-tags
       - name: Publish to NPM
         if: ${{env.publish == 'true' }}
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           echo "//npm.pkg.github.com/:_authToken=${{ env.NODE_AUTH_TOKEN }}" > ~/.npmrc
           yarn publish
