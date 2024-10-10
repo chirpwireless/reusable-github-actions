@@ -14,7 +14,7 @@ jobs:
     runs-on:
       group: gke-non-prod
     env:
-      publish: ${{github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'}}
+      publish: ${{github.ref != 'refs/heads/main' || github.ref == 'refs/heads/master'}}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
