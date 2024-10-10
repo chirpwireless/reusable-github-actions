@@ -1,0 +1,64 @@
+name: Build a frontend library
+on:
+  workflow_call:
+    outputs:
+      new-version:
+        description: "The new service version"
+        value: ${{ jobs.generate-version.outputs.service-version }}
+
+env:
+   HOME: ${{github.workspace}}
+
+jobs:
+  generate-version:
+    runs-on:
+      group: gke-non-prod
+    outputs:
+      service-version: ${{ steps.version.outputs.new_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
+      - name: "Create a summary"
+        run: |
+          echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
+
+  build:
+    runs-on:
+      group: gke-non-prod
+    needs: [ generate-version ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup NodeJS
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      # Install yarn as we are using a self-hosted runner
+      - name: Install Yarn
+        run: |
+          npm install -g yarn@1.22.22
+      - name: Cache yarn dependencies
+        uses: actions/cache@v3
+        id: cache-dependencies
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Install yarn dependencies
+        run: yarn install --frozen-lockfile
+      - name: Run lint
+        run: yarn run lint
+      - name: Run build
+        run: yarn build
+
+  publish-release:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on:
+      group: gke-non-prod
+    needs: [ generate-version, build ]
+    steps:
+      - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
+        with:
+          version: ${{ needs.generate-version.outputs.service-version }}
