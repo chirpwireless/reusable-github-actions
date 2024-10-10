@@ -34,14 +34,15 @@ jobs:
         run: yarn build
       - name: Bump Version
         if: ${{env.publish == 'true' }}
-        run: yarn version --minor
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          yarn version --minor
       - name: Commit and Push Version Change
         if: ${{env.publish == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
           git push --follow-tags
       - name: Publish to NPM
         if: ${{env.publish == 'true' }}
