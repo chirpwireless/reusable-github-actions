@@ -14,7 +14,7 @@ jobs:
     runs-on:
       group: gke-non-prod
     env:
-      publish: ${{github.ref != 'refs/heads/main' || github.ref == 'refs/heads/master'}}
+      publish: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,14 +26,6 @@ jobs:
       - name: Install Yarn
         run: |
           npm install -g yarn@1.22.22
-      - name: Cache yarn dependencies
-        uses: actions/cache@v3
-        id: cache-dependencies
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
       - name: Install yarn dependencies
         run: yarn install --frozen-lockfile
 #      - name: Run lint
