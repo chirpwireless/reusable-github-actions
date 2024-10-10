@@ -35,6 +35,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Setup NodeJS and Yarn
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'yarn'
+      - name: Install yarn dependencies
+        run: yarn install --frozen-lockfile --ignore-engines
+      - name: Run build
+        run: yarn build
+      - name: Install yarn production dependencies
+        run: yarn install --production --frozen-lockfile --ignore-engines
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
