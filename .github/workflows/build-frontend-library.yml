@@ -13,7 +13,7 @@ env:
 jobs:
   build:
     runs-on:
-      group: gke-non-prod
+      group: builder
     steps:
 #      - uses: actions/create-github-app-token@v1
 #        id: app-token
