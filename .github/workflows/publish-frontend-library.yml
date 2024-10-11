@@ -40,6 +40,4 @@ jobs:
           echo "@chirpwireless:registry=https://npm.pkg.github.com" > ~/.npmrc
           echo "//npm.pkg.github.com/:_authToken=${{ env.NODE_AUTH_TOKEN }}" > ~/.npmrc
           yarn version --minor
-          git add .
-          git commit -m "release package" -n
           git push origin --follow-tags
