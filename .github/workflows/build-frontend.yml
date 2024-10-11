@@ -30,20 +30,20 @@ jobs:
 
   build:
     runs-on:
-      group: gke-non-prod
+      group: builder
     needs: [ generate-version ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Setup NodeJS and Yarn
+      - name: Setup NodeJS
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
       # Install yarn as we are using a self-hosted runner
-      - name: Setup Corepack
+      - name: Setup Yarn
         shell: bash
         run: |
-          corepack enable
+          npm install -g yarn@1.22.22
       - name: Install yarn dependencies
         run: yarn install --frozen-lockfile
       - name: Run build
