@@ -40,4 +40,4 @@ jobs:
           yarn version --minor
           git add .
           git commit -m "release package" -n
-          git push origin main --follow-tags
+          git push origin --follow-tags
