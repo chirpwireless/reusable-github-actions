@@ -1,4 +1,4 @@
-name: Build a Node.js microservice and publish it to Docker registry
+name: Build a frontend application and publish it to Docker registry
 on:
   workflow_call:
     inputs:
