@@ -6,7 +6,7 @@ env:
   HOME: ${{github.workspace}}
 
 jobs:
-  publish:
+  build:
     runs-on:
       group: gke-non-prod
     steps:
@@ -33,10 +33,9 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Publish packages
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
+          echo "//npm.pkg.github.com/:_authToken=${{ env.NODE_AUTH_TOKEN }}" > ~/.npmrc
           yarn version --minor
           git add .
           git commit -m "release package" -n
