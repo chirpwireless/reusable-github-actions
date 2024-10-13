@@ -102,6 +102,9 @@ jobs:
           tags: ${{ env.DOCKER_IMAGE }}
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.20.0
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
           image-ref: ${{ env.DOCKER_IMAGE }}
           format: 'table'
