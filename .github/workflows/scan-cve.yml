@@ -1,0 +1,46 @@
+name: Scans vulnerabilities in the published Docker image
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        description: "The service name to be scanned"
+        type: string
+        required: true
+      version:
+        description: "Version to be scanned"
+        type: string
+
+env:
+   HOME: ${{github.workspace}}
+
+jobs:
+  fetch_version:
+    runs-on:
+      group: gke-non-prod
+    outputs:
+      version: ${{steps.fetch-version.outputs.version}}
+    steps:
+      - id: fetch-version
+        uses: chirpwireless/reusable-github-actions/.github/actions/version-fetch@main
+        with:
+          git-ref: ${{ inputs.version || github.ref }}
+      - run: |
+          echo "Scanning the version ${{steps.fetch-version.outputs.version}}" > $GITHUB_STEP_SUMMARY
+
+  scan:
+    runs-on:
+      group: gke-non-prod
+    needs: [ fetch_version ]
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.20.0
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.fetch_version.outputs.version }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
