@@ -12,7 +12,7 @@ on:
         value: ${{ jobs.generate-version.outputs.service-version }}
 
 env:
-   HOME: ${{github.workspace}}
+  HOME: ${{github.workspace}}
 
 jobs:
   generate-version:
@@ -31,20 +31,22 @@ jobs:
   build:
     runs-on:
       group: builder
-    needs: [ generate-version ]
+    needs: [generate-version]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup NodeJS
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: ".nvmrc"
       # Install yarn as we are using a self-hosted runner
       - name: Setup Yarn
         shell: bash
         run: |
           npm install -g yarn@1.22.22
       - name: Install yarn dependencies
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
         run: yarn install --frozen-lockfile
       - name: Run build
         run: yarn build
@@ -68,7 +70,7 @@ jobs:
   publish-version:
     runs-on:
       group: gke-non-prod
-    needs: [ generate-version, build ]
+    needs: [generate-version, build]
     permissions:
       checks: write
     steps:
@@ -82,7 +84,7 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
       group: gke-non-prod
-    needs: [ generate-version, build ]
+    needs: [generate-version, build]
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
         with:
