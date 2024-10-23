@@ -67,9 +67,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name github-actions
-          git config user.email github-actions[bot]@users.noreply.github.com
-
           # Conditionally set the version with or without a suffix
           VERSION="${{ needs.generate-version.outputs.service-version }}"
           if [ -n "${{ inputs.package_suffix }}" ]; then
