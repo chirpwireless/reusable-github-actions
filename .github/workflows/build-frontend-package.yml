@@ -73,7 +73,7 @@ jobs:
           # Conditionally set the version with or without a suffix
           VERSION="${{ needs.generate-version.outputs.service-version }}"
           if [ -n "${{ inputs.package_suffix }}" ]; then
-            VERSION="$VERSION-${{ inputs.package_suffix }}"
+            VERSION="$VERSION.${{ inputs.package_suffix }}"
           fi
 
           yarn version --new-version "$VERSION"
