@@ -1,4 +1,4 @@
-name: Build a frontend library
+name: Build a frontend package
 on:
   workflow_call:
     inputs:
