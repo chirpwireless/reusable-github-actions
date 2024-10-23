@@ -6,6 +6,10 @@ on:
         type: boolean
         default: false
         description: "True if you want to publish the build output to Github Registry"
+      release:
+        type: boolean
+        default: false
+        description: "True if you want to create a release"
       env_local:
         type: string
         default: ""
@@ -89,7 +93,7 @@ jobs:
           build-version: ${{ needs.generate-version.outputs.service-version }}
 
   publish-release:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && inputs.release == 'true'
     runs-on:
       group: gke-non-prod
     needs: [generate-version, build]
