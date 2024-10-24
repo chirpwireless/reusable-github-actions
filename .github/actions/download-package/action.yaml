@@ -21,7 +21,6 @@ runs:
       with:
         script: |
           const fs = require('fs');
-          const fetch = require('node-fetch');
 
           // Retrieve inputs from the workflow
           const packageName = "${{ inputs.package_name }}";
