@@ -1,0 +1,24 @@
+name: "Unarchive Package"
+description: "Unarchives file with support for various archive formats."
+
+inputs:
+  file_name:
+    description: "Name of the file for the unarchiving"
+    required: true
+  file_ext:
+    description: "File extension (e.g., tgz, tar.gz)"
+    required: true
+    default: "tgz"
+
+runs:
+  using: composite
+  steps:
+    - id: unarchive-package
+      uses: actions/github-script@v6
+      env:
+        FILE_EXT: ${{ inputs.file_ext }}
+        FILE_NAME: ${{ inputs.file_name }}
+      with:
+        script: |
+          const { unarchivePackage } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
+          return unarchivePackage({ core });

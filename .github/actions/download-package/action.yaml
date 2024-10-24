@@ -1,0 +1,43 @@
+name: "Download a GitHub Package"
+description: "Downloads a specified package from GitHub Packages with support for version suffixes and custom file extensions."
+
+inputs:
+  package_name:
+    description: "Name of the package"
+    required: true
+  package_ext:
+    description: "Package extension (e.g., tgz, tar.gz)"
+    required: true
+    default: "tgz"
+  package_suffix:
+    description: "Suffix to append to the package version (optional)"
+    required: false
+    default: ""
+  version:
+    description: "Package version"
+    required: true
+  github-token:
+    description: "The GitHub token"
+    required: true
+    default: ${{ github.token }}
+
+outputs:
+  file_name:
+    description: "Filename of the downloaded package"
+    value: ${{ steps.download-package.outputs.result }}
+
+runs:
+  using: composite
+  steps:
+    - id: download-package
+      uses: actions/github-script@v6
+      env:
+        PACKAGE_NAME: "${{ inputs.package_name }}"
+        PACKAGE_EXT: "${{ inputs.package_ext }}"
+        PACKAGE_SUFFIX: "${{ inputs.package_suffix }}"
+        PACKAGE_VERSION: "${{ inputs.version }}"
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      with:
+        script: |
+          const { downloadPackage } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
+          return downloadPackage({ context, core });
