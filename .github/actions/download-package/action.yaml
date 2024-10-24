@@ -40,30 +40,47 @@ runs:
 
           // Append the suffix to the version if it's provided
           const finalVersion = packageSuffix ? `${packageVersion}.${packageSuffix}` : packageVersion;
-          const fileName = `${packageName}-${finalVersion}.${packageExtension}`;
 
-          // Construct the URL for downloading the package
-          const url = `https://npm.pkg.github.com/@${owner}/${packageName}/-/${fileName}`;
+          // Get the package metadata
+          const response = await fetch(`https://npm.pkg.github.com/@${owner}/${packageName}`, {
+            headers: {
+              'Authorization': `token ${token}`,
+              'Accept': 'application/json'
+            }
+          });
 
-          console.log(`Downloading package from: ${url}`);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch package metadata: ${response.statusText}`);
+          }
 
-          // Fetch the package .tgz file
-          const response = await fetch(url, {
+          const data = await response.json();
+
+          // Get the tarball URL for the specified version
+          const url = data.versions[finalVersion]?.dist?.tarball;
+
+          // Check if URL is empty
+          if (!url) {
+            throw new Error(`Package version not found: ${finalVersion}`);
+          }
+
+          // Download the package tarball
+          const packageResponse = await fetch(url, {
             headers: {
               'Authorization': `token ${token}`
             }
           });
 
-          if (!response.ok) {
-            throw new Error(`Failed to download package: ${response.statusText}`);
+          if (!packageResponse.ok) {
+            throw new Error(`Failed to download package: ${packageResponse.statusText}`);
           }
 
-          // Save the downloaded file
+          // Write the downloaded package to a file
+          const fileName = `${packageName}-${finalVersion}.${packageExtension}`;
           const fileStream = fs.createWriteStream(fileName);
           await new Promise((resolve, reject) => {
-            response.body.pipe(fileStream);
-            response.body.on('error', reject);
-            fileStream.on('finish', resolve);
+            packageResponse.body.pipe(fileStream);
+            packageResponse.body.on("error", reject);
+            fileStream.on("finish", resolve);
           });
 
-          console.log(`Package downloaded and saved as ${fileName}`);
+          console.log(`Package downloaded as ${fileName}`);
