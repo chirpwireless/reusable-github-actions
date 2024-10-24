@@ -1,5 +1,5 @@
-name: "Download a GitHub Package"
-description: "Download a GitHub package"
+name: "Unarchive Package"
+description: "Unarchives file with support for various archive formats."
 
 inputs:
   file_name:

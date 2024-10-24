@@ -1,5 +1,5 @@
 name: "Download a GitHub Package"
-description: "Download a GitHub package"
+description: "Downloads a specified package from GitHub Packages with support for version suffixes and custom file extensions."
 
 inputs:
   package_name:
