@@ -16,6 +16,10 @@ inputs:
   version:
     description: "Package version"
     required: true
+  github-token:
+    description: "The GitHub token"
+    required: true
+    default: ${{ github.token }}
 
 runs:
   using: composite
@@ -32,7 +36,7 @@ runs:
           const packageSuffix = "${{ inputs.package_suffix }}";
           const packageVersion = "${{ inputs.version }}";
           const owner = context.repo.owner;
-          const token = process.env.GITHUB_TOKEN;
+          const token = "${{ inputs.github-token }}";
 
           // Append the suffix to the version if it's provided
           const finalVersion = packageSuffix ? `${packageVersion}.${packageSuffix}` : packageVersion;
