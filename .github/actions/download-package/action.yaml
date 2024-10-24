@@ -1,0 +1,58 @@
+name: "Download a github package"
+description: "Download a github package"
+
+inputs:
+  package_name:
+    description: "Name of the package"
+    required: true
+  package_ext:
+    description: "Package extension (e.g., tgz, tar.gz)"
+    required: true
+    default: "tgz"
+  version:
+    description: "Package version"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - id: download-package
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const fetch = require('node-fetch');
+
+          // Retrieve inputs from the workflow
+          const packageName = "${{ inputs.package_name }}";
+          const packageExtension = "${{ inputs.package_ext }}";
+          const packageVersion = "${{ inputs.version }}";
+          const owner = context.repo.owner;
+          const token = process.env.GITHUB_TOKEN;
+
+          // Construct the URL for downloading the package
+          const url = `https://npm.pkg.github.com/@${owner}/${packageName}/-/${packageName}-${packageVersion}.${packageExtension}`;
+
+          console.log(`Downloading package from: ${url}`);
+
+          // Fetch the package .tgz file
+          const response = await fetch(url, {
+            headers: {
+              'Authorization': `token ${token}`
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to download package: ${response.statusText}`);
+          }
+
+          // Save the downloaded file
+          const fileName = `${packageName}-${packageVersion}.${packageExtension}`;
+          const fileStream = fs.createWriteStream(fileName);
+          await new Promise((resolve, reject) => {
+            response.body.pipe(fileStream);
+            response.body.on('error', reject);
+            fileStream.on('finish', resolve);
+          });
+
+          console.log(`Package downloaded and saved as ${fileName}`);
