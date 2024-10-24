@@ -20,5 +20,5 @@ runs:
         FILE_NAME: ${{ inputs.file_name }}
       with:
         script: |
-          const { downloadPackage } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
+          const { unarchivePackage } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
           await unarchivePackage({ core });
