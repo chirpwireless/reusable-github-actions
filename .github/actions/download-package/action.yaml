@@ -21,6 +21,11 @@ inputs:
     required: true
     default: ${{ github.token }}
 
+outputs:
+  file_name:
+    description: "Filename of the downloaded package"
+    value: ${{ steps.download-package.outputs.result }}
+
 runs:
   using: composite
   steps:
