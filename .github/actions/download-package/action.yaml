@@ -1,5 +1,5 @@
-name: "Download a github package"
-description: "Download a github package"
+name: "Download a GitHub Package"
+description: "Download a GitHub package"
 
 inputs:
   package_name:
@@ -29,6 +29,7 @@ runs:
       with:
         script: |
           const fs = require('fs');
+          const { pipeline } = require('stream');
 
           // Retrieve inputs from the workflow
           const packageName = "${{ inputs.package_name }}";
@@ -78,9 +79,41 @@ runs:
           const fileName = `${packageName}-${finalVersion}.${packageExtension}`;
           const fileStream = fs.createWriteStream(fileName);
           await new Promise((resolve, reject) => {
-            packageResponse.body.pipe(fileStream);
-            packageResponse.body.on("error", reject);
-            fileStream.on("finish", resolve);
+            pipeline(packageResponse.body, fileStream, (err) => {
+              if (err) {
+                reject(err);
+              } else {
+                resolve();
+              }
+            });
           });
 
           console.log(`Package downloaded as ${fileName}`);
+
+    - id: unarchive-package
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { execSync } = require('child_process');
+
+          // Retrieve inputs from the workflow
+          const packageName = "${{ inputs.package_name }}";
+          const packageExtension = "${{ inputs.package_ext }}";
+          const packageSuffix = "${{ inputs.package_suffix }}";
+          const packageVersion = "${{ inputs.version }}";
+
+          // Append the suffix to the version if it's provided
+          const finalVersion = packageSuffix ? `${packageVersion}.${packageSuffix}` : packageVersion;
+
+          // Construct the package file name
+          const fileName = `${packageName}-${finalVersion}.${packageExtension}`;
+
+          console.log(`Unarchiving ${fileName}...`);
+
+          // Unarchive based on the file extension
+          if (packageExtension === "tgz" || packageExtension === "tar.gz") {
+            execSync(`tar -xzf ${fileName}`, { stdio: 'inherit' });
+            console.log("Package unarchived.");
+          } else {
+            console.log(`Unrecognized extension for unarchiving: ${packageExtension}`);
+          }
