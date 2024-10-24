@@ -1,4 +1,5 @@
-const { execSync } = require("child_process");
+const fs = require("fs");
+const { pipeline } = require("stream");
 
 // Function to download the package
 exports.downloadPackage = async ({ context, core }) => {
@@ -51,9 +52,6 @@ exports.downloadPackage = async ({ context, core }) => {
     core.setFailed(`Failed to download package: ${packageResponse.statusText}`);
     return undefined;
   }
-
-  const fs = require("fs");
-  const { pipeline } = require("stream");
 
   const fileName = `${PACKAGE_NAME}-${finalVersion}.${PACKAGE_EXT}`;
   const fileStream = fs.createWriteStream(fileName);
