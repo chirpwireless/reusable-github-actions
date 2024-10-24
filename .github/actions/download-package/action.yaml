@@ -9,6 +9,10 @@ inputs:
     description: "Package extension (e.g., tgz, tar.gz)"
     required: true
     default: "tgz"
+  package_suffix:
+    description: "Suffix to append to the package version (optional)"
+    required: false
+    default: ""
   version:
     description: "Package version"
     required: true
@@ -25,12 +29,17 @@ runs:
           // Retrieve inputs from the workflow
           const packageName = "${{ inputs.package_name }}";
           const packageExtension = "${{ inputs.package_ext }}";
+          const packageSuffix = "${{ inputs.package_suffix }}";
           const packageVersion = "${{ inputs.version }}";
           const owner = context.repo.owner;
           const token = process.env.GITHUB_TOKEN;
 
+          // Append the suffix to the version if it's provided
+          const finalVersion = packageSuffix ? `${packageVersion}.${packageSuffix}` : packageVersion;
+          const fileName = `${packageName}-${finalVersion}.${packageExtension}`;
+
           // Construct the URL for downloading the package
-          const url = `https://npm.pkg.github.com/@${owner}/${packageName}/-/${packageName}-${packageVersion}.${packageExtension}`;
+          const url = `https://npm.pkg.github.com/@${owner}/${packageName}/-/${fileName}`;
 
           console.log(`Downloading package from: ${url}`);
 
@@ -46,7 +55,6 @@ runs:
           }
 
           // Save the downloaded file
-          const fileName = `${packageName}-${packageVersion}.${packageExtension}`;
           const fileStream = fs.createWriteStream(fileName);
           await new Promise((resolve, reject) => {
             response.body.pipe(fileStream);
