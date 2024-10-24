@@ -1,0 +1,24 @@
+name: "Download a GitHub Package"
+description: "Download a GitHub package"
+
+inputs:
+  file_name:
+    description: "Name of the file for the unarchiving"
+    required: true
+  file_ext:
+    description: "File extension (e.g., tgz, tar.gz)"
+    required: true
+    default: "tgz"
+
+runs:
+  using: composite
+  steps:
+    - id: unarchive-package
+      uses: actions/github-script@v6
+      env:
+        FILE_EXT: ${{ inputs.file_ext }}
+        FILE_NAME: ${{ inputs.file_name }}
+      with:
+        script: |
+          const { downloadPackage } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
+          await unarchivePackage({ core });
