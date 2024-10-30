@@ -83,9 +83,6 @@ jobs:
     permissions:
       checks: write
     steps:
-      - name: Check ref and release input
-        run: |
-          echo "github.ref: ${{ github.ref }}, release: ${{ inputs.release }}"
       - name: Publish Version
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
@@ -93,7 +90,7 @@ jobs:
           build-version: ${{ needs.generate-version.outputs.service-version }}
 
   publish-release:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && inputs.release == 'true'
+    if: github.ref == 'refs/heads/main' && inputs.release == 'true'
     runs-on:
       group: gke-non-prod
     needs: [generate-version, build]
