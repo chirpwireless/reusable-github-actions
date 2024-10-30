@@ -83,6 +83,9 @@ jobs:
     permissions:
       checks: write
     steps:
+      - name: Check ref and release input
+        run: |
+          echo "github.ref: ${{ github.ref }}, release: ${{ inputs.release }}"
       - name: Publish Version
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
