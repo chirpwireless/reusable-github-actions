@@ -90,7 +90,7 @@ jobs:
           build-version: ${{ needs.generate-version.outputs.service-version }}
 
   publish-release:
-    if: github.ref == 'refs/heads/main' && inputs.release
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && inputs.release
     runs-on:
       group: gke-non-prod
     needs: [generate-version, build]
