@@ -76,6 +76,7 @@ jobs:
           yarn publish --no-git-tag-version
 
   publish-version:
+    if: inputs.publish
     runs-on:
       group: gke-non-prod
     needs: [generate-version, build]
