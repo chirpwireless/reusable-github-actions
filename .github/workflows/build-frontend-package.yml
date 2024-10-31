@@ -49,7 +49,7 @@ jobs:
           node-version-file: ".nvmrc"
       - name: Prepare .env.local file
         run: |
-          echo "${{ secrets[matrix.combo.config] }}" > .env.local
+          echo "${{ secrets[matrix.combo.env_local] }}" > .env.local
       - name: Install Yarn
         run: |
           npm install -g yarn@1.22.22
