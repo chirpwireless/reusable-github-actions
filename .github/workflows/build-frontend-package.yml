@@ -10,7 +10,7 @@ on:
         type: boolean
         default: false
         description: "True if you want to create a release"
-      env_local:
+      config:
         type: string
         required: true
         description: 'Array of env_local and suffix pairs in JSON format (e.g., ''[{"env_local": "STAGING_ENV_LOCAL", "suffix": "staging"}, {"env_local": "PROD_ENV_LOCAL", "suffix": "prod"}]'')'
@@ -39,7 +39,7 @@ jobs:
     needs: [generate-version]
     strategy:
       matrix:
-        combo: ${{ fromJson(inputs.env_local) }}
+        combo: ${{ fromJson(inputs.config) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -49,7 +49,7 @@ jobs:
           node-version-file: ".nvmrc"
       - name: Prepare .env.local file
         run: |
-          echo "${{ secrets[matrix.combo.env_local] }}" > .env.local
+          echo "${{ secrets[matrix.combo.config] }}" > .env.local
       - name: Install Yarn
         run: |
           npm install -g yarn@1.22.22
