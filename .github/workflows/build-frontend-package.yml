@@ -10,14 +10,10 @@ on:
         type: boolean
         default: false
         description: "True if you want to create a release"
-      env_local:
+      config:
         type: string
         required: true
-        description: "The JSON list of .env.local file"
-      package_suffix:
-        type: string
-        default: ""
-        description: "The suffix for the package version"
+        description: 'Array of env_local and suffix pairs in JSON format (e.g., ''[{"env_local": "STAGING_ENV_LOCAL", "suffix": "staging"}, {"env_local": "PROD_ENV_LOCAL", "suffix": "prod"}]'')'
 
 env:
   HOME: ${{github.workspace}}
@@ -43,7 +39,7 @@ jobs:
     needs: [generate-version]
     strategy:
       matrix:
-        env_name: ${{ fromJson(inputs.env_local) }}
+        combo: ${{ fromJson(inputs.config) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -53,7 +49,7 @@ jobs:
           node-version-file: ".nvmrc"
       - name: Prepare .env.local file
         run: |
-          echo "${{ secrets[matrix.env_name] }}" > .env.local
+          echo "${{ secrets[matrix.combo.config] }}" > .env.local
       - name: Install Yarn
         run: |
           npm install -g yarn@1.22.22
@@ -68,8 +64,8 @@ jobs:
         run: |
           # Conditionally set the version with or without a suffix
           VERSION="${{ needs.generate-version.outputs.service-version }}"
-          if [ -n "${{ inputs.package_suffix }}" ]; then
-            VERSION="$VERSION.${{ inputs.package_suffix }}"
+          if [ -n "${{ matrix.combo.suffix }}" ]; then
+            VERSION="$VERSION.${{ matrix.combo.suffix }}"
           fi
 
           yarn version --new-version "$VERSION"
