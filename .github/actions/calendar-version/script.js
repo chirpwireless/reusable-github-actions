@@ -1,41 +1,48 @@
 exports.generateVersion = async ({github, context, core}) => {
     try {
-        const now = new Date();
-        const year = now.getUTCFullYear();
-        const monthDay = `${now.getUTCMonth() + 1}${now.getUTCDate()}`.padStart(4, '0');
-        const time = `${now.getUTCHours()}${now.getUTCMinutes()}${now.getUTCSeconds()}`.padStart(6, '0');
+        // Generate base version using current UTC date
+        let coreVersion = new Date().toISOString()
+            .replace(/[-:]/g, '')
+            .replace(/T/, '.')
+            .replace(/\..+/, '');
 
-        let coreVersion = `${year}.${monthDay}.${time}`;
-
-        // Determine the SHA to use
+        // Determine SHA
         let sha;
-        if (github.context.eventName === 'pull_request' && !/^(refs\/heads\/)?(master|main)$/.test(github.context.ref)) {
+        if (github.context.eventName === 'pull_request' &&
+            !github.context.ref.match(/.*(master|main)/)) {
             sha = github.context.payload.pull_request.head.sha;
         } else {
             sha = github.context.sha;
+            if (!sha) {
+                throw new Error(`Unable to find the sha for event ${github.context.eventName}`);
+            }
         }
 
-        if (!sha) {
-            core.setFailed(`Unable to find the SHA for event ${github.context.eventName}`);
-            return;
+        // Append SHA to version
+        if (sha) {
+            coreVersion += `-${sha.substring(0, 7)}`;
         }
 
-        coreVersion += `-${sha.substring(0, 7)}`;
+        // Add branch name for non-main branches
+        if (!github.context.ref.match(/.*(master|main)/)) {
+            let headRef = github.context.headRef || github.context.ref;
+            headRef = headRef.replace('refs/heads/', '');
+            headRef = headRef.replace(/[^a-zA-Z0-9]/g, '-');
 
-        // Append branch name for non-main branches
-        if (!/^(refs\/heads\/)?(master|main)$/.test(github.context.ref)) {
-            const ref = github.context.ref.replace('refs/heads/', '');
-            const sanitizedRef = ref.replace(/[^a-zA-Z0-9]/g, '-');
-            coreVersion += `-${sanitizedRef}`;
+            if (headRef) {
+                coreVersion += `-${headRef}`;
+            }
         }
 
-        // Trim version to 63 characters and ensure it ends with an alphanumeric character
+        // Trim version according to kubernetes label restrictions
         if (coreVersion.length > 63) {
-            coreVersion = coreVersion.substring(0, 63).replace(/[^a-zA-Z0-9]*$/, '');
-            core.warning('Version was trimmed to comply with Kubernetes label restrictions.');
+            coreVersion = coreVersion.substring(0, 63);
+            coreVersion = coreVersion.replace(/[^a-zA-Z0-9]*$/, '');
+            core.warning('tag was trimmed because of limitation of kubernetes labels');
         }
 
         return coreVersion;
+
     } catch (error) {
         core.setFailed(error.message);
     }
