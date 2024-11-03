@@ -13,7 +13,6 @@ runs:
       uses: actions/github-script@v7
       with:
         result-encoding: string
-        github-token: ${{ inputs.github-token }}
         script: |
           const { generateVersion } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
           return generateVersion({ github, context, core });
