@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: version
-        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
+        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@feature/calendar-version-imprvement
       - name: "Create a summary"
         run: |
           echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
