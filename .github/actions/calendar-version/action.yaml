@@ -4,7 +4,7 @@ description: Generates UTC-based CalVer in the format YYYY.mdd.HHMMSS-sha{7 symb
 outputs:
   new_version:
     description: "Newly generated version"
-    value: ${{ steps.calendar-version.outputs.version }}
+    value: ${{ steps.calendar-version.outputs.result }}
 
 runs:
   using: "composite"
@@ -15,5 +15,5 @@ runs:
         result-encoding: string
         github-token: ${{ inputs.github-token }}
         script: |
-          const { fetchRef } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
-          return fetchRef({ github, context, core });
+          const { generateVersion } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
+          return generateVersion({ github, context, core });

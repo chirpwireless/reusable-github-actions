@@ -35,7 +35,7 @@ exports.generateVersion = async ({github, context, core}) => {
             core.warning('Version was trimmed to comply with Kubernetes label restrictions.');
         }
 
-        core.setOutput('new_version', coreVersion);
+        return coreVersion;
     } catch (error) {
         core.setFailed(error.message);
     }
