@@ -4,46 +4,15 @@ description: Generates UTC-based CalVer in the format YYYY.mdd.HHMMSS-sha{7 symb
 outputs:
   new_version:
     description: "Newly generated version"
-    value: ${{ steps.calendar-version.outputs.version }}
+    value: ${{ steps.calendar-version.outputs.result }}
 
 runs:
   using: "composite"
   steps:
     - id: calendar-version
-      shell: bash
-      run: |
-        coreVersion=$(date -u '+%Y.%-m%d.%-H%M%S')
-        if ([[ ${{ github.event_name }} == 'pull_request' ]]) && (! [[ "${{ github.ref }}" =~ ^.*(master|main) ]]); then
-          sha=${{ github.event.pull_request.head.sha }}
-        else 
-          if [[ -n "${{ github.sha }}" ]]; then
-            sha=${{ github.sha }}
-          else
-            echo "::error:: Unable to find the sha for event ${{ github.event_name }}" 
-            exit 1
-          fi  
-        fi
-
-        coreVersion=${coreVersion}${sha:+-${sha::7}}
-        if ! [[ "${{ github.ref }}" =~ ^.*(master|main) ]]; then
-          if [[ -n "${{ github.head_ref }}" ]]; then
-            HEAD_REF=$(printf "%q" "${{ github.head_ref }}")
-          else
-            HEAD_REF=$(printf "%q" "${{ github.ref }}")
-          fi
-          HEAD_REF=${HEAD_REF/refs\/heads\//}
-          HEAD_REF=$(echo $HEAD_REF | sed 's/[^a-zA-Z0-9]/-/g')
-          coreVersion=$coreVersion${HEAD_REF:+-${HEAD_REF}}
-        fi
-
-        if (( ${#coreVersion} > 63 )); then
-          # trim version according to kubernetes label restrictions: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
-          # first trim to 63 characters
-          coreVersion=${coreVersion:0:63}
-          # then also make sure that it ends in alphanumeric character
-          coreVersion=$(echo "$coreVersion" | sed 's/[^a-zA-Z0-9]*$//')
-          echo "::warning:: tag was trimmed because of limitation of kubernetes labels"
-        fi
-        echo $coreVersion
-
-        echo "version=$coreVersion" >> $GITHUB_OUTPUT
+      uses: actions/github-script@v7
+      with:
+        result-encoding: string
+        script: |
+          const { generateVersion } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
+          return generateVersion({ github, context, core });
