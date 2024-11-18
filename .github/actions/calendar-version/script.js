@@ -1,9 +1,7 @@
 exports.generateVersion = async ({github, context, core}) => {
     // Generate base version using current UTC date
-    let coreVersion = new Date().toISOString()
-        .replace(/[-:]/g, '')
-        .replace(/T/, '.')
-        .replace(/\..+/, '');
+    let date = new Date();
+    let coreVersion = `${date.getFullYear()}.${date.getMonth()+1}${date.getDate()}.${date.getHours()}${date.getMinutes()}${date.getSeconds()}`;
 
     // Determine SHA
     let sha;
