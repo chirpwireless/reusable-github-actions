@@ -18,7 +18,7 @@ env:
 jobs:
   generate-version:
     runs-on:
-      group: gke-non-prod
+      group: builder
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
