@@ -22,8 +22,6 @@ jobs:
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
-      - name: Increase git buffer size
-        run: git config --global http.postBuffer 524288000 # 500MB
       - uses: actions/checkout@v4
       - id: version
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
