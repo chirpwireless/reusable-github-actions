@@ -30,8 +30,6 @@ jobs:
   build:
     runs-on:
       group: gke-non-prod
-    permissions:
-      checks: write
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
     env:
