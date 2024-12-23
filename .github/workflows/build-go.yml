@@ -46,7 +46,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: '${{ inputs.app_dir }}/go.mod'
-          cache-dependency-path: '${{ inputs.app_dir }}/go.sum'
+          cache: false
       - name: Set up gotestfmt
         uses: GoTestTools/gotestfmt-action@v2
         with:
