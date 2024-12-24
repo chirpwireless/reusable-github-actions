@@ -1,0 +1,94 @@
+name: Validate a Terraform modules
+on:
+  workflow_call:
+    outputs:
+      new-version:
+        description: "The new service version"
+        value: ${{ jobs.generate-version.outputs.service-version }}
+
+env:
+  HOME: ${{github.workspace}}
+
+jobs:
+  generate-version:
+    runs-on:
+      group: gke-non-prod
+    outputs:
+      service-version: ${{ steps.version.outputs.new_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
+      - name: "Create a summary"
+        run: |
+          echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
+
+  terraform-validate:
+    runs-on:
+      group: gke-non-prod
+    needs: [generate-version]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "16"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Find and Validate Modules
+        run: |
+          find modules -type f -name "*.tf" -exec dirname {} \; | sort -u | while read -r dir; do
+            echo "Validating Terraform module in $dir"
+            cd "$dir"
+            terraform init -backend=false
+            terraform validate
+            cd -
+          done
+
+      - name: Check Formatting
+        run: |
+          find modules -type f -name "*.tf" | while read -r file; do
+            terraform fmt -check "$file"
+          done
+
+      - name: Lint Terraform (tflint)
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: Check Lint
+        run: |
+          find modules -type f -name "*.tf" -exec dirname {} \; | sort -u | while read -r dir; do
+            echo "Linting Terraform module in $dir"
+            cd "$dir"
+            tflint --init
+            tflint -f compact
+            cd -
+          done
+
+  publish-version:
+    runs-on:
+      group: gke-non-prod
+    needs: [generate-version, terraform-validate]
+    permissions:
+      checks: write
+    steps:
+      - name: Publish Version
+        uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
+        with:
+          commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          build-version: ${{ needs.generate-version.outputs.service-version }}
+
+  publish-release:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on:
+      group: gke-non-prod
+    needs: [generate-version, terraform-validate]
+    steps:
+      - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
+        with:
+          version: ${{ needs.generate-version.outputs.service-version }}
