@@ -1,4 +1,4 @@
-name: Validate a Terraform with Terragrunt
+name: Deploy a Terraform with Terragrunt
 on:
   workflow_call:
     inputs:
