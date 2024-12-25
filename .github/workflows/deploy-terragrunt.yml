@@ -75,13 +75,6 @@ jobs:
           private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
-      - name: Prepare scaleway configuration
-        run: |
-          mkdir -p $HOME/.aws
-          mkdir -p $HOME/.config/scw
-          echo "${{ secrets.SCW_AWS_CREDENTIALS }}" > $HOME/.aws/credentials
-          echo "${{ secrets.SCW_CREDENTIALS }}" > $HOME/.config/scw/config.yaml
-
       - name: Create a deploy plan using Terragrunt
         uses: gruntwork-io/terragrunt-action@v2
         env:
@@ -90,6 +83,12 @@ jobs:
           # Configure Git to use installation token
           INPUT_PRE_EXEC_1: |
             git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+          # Configure Scaleway and AWS credentials
+          INPUT_PRE_EXEC_2: |
+            mkdir -p $HOME/.aws
+            mkdir -p $HOME/.config/scw
+            echo "${{ secrets.SCW_AWS_CREDENTIALS }}" > $HOME/.aws/credentials
+            echo "${{ secrets.SCW_CREDENTIALS }}" > $HOME/.config/scw/config.yaml
         with:
           tf_version: ${{ inputs.tf_version }}
           tg_version: ${{ inputs.tg_version }}
@@ -115,13 +114,6 @@ jobs:
           private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
-      - name: Prepare scaleway configuration
-        run: |
-          mkdir -p $HOME/.aws
-          mkdir -p $HOME/.config/scw
-          echo "${{ secrets.SCW_AWS_CREDENTIALS }}" > $HOME/.aws/credentials
-          echo "${{ secrets.SCW_CREDENTIALS }}" > $HOME/.config/scw/config.yaml
-
       - name: Deploy using Terragrunt
         uses: gruntwork-io/terragrunt-action@v2
         env:
@@ -130,6 +122,12 @@ jobs:
           # Configure Git to use installation token
           INPUT_PRE_EXEC_1: |
             git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+          # Configure Scaleway and AWS credentials
+          INPUT_PRE_EXEC_2: |
+            mkdir -p $HOME/.aws
+            mkdir -p $HOME/.config/scw
+            echo "${{ secrets.SCW_AWS_CREDENTIALS }}" > $HOME/.aws/credentials
+            echo "${{ secrets.SCW_CREDENTIALS }}" > $HOME/.config/scw/config.yaml
         with:
           tf_version: ${{ inputs.tf_version }}
           tg_version: ${{ inputs.tg_version }}
