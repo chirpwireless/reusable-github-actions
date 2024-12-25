@@ -1,0 +1,114 @@
+name: Validate a Terraform with Terragrunt
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Git reference (branch, tag or SHA) of commit to deploy"
+        type: string
+      environment:
+        required: true
+        description: "Environment (k8s namespace)"
+        type: string
+      tf_version:
+        description: "Terraform version to use"
+        type: string
+        default: "1.10.3"
+      tg_version:
+        description: "Terragrunt version to use"
+        type: string
+        default: "0.71.1"
+      tg_working_dir:
+        description: "Directory in which Terragrunt will be invoked"
+        type: string
+        required: true
+      scw_secret_name:
+        type: string
+        required: true
+        description: "Name of the Scaleway config secret to use"
+
+env:
+  HOME: ${{github.workspace}}
+
+jobs:
+  fetch_version:
+    runs-on:
+      group: gke-non-prod
+    outputs:
+      version: ${{steps.fetch-version.outputs.version}}
+    steps:
+      - id: fetch-version
+        uses: chirpwireless/reusable-github-actions/.github/actions/version-fetch@main
+        with:
+          git-ref: ${{ inputs.version }}
+      - run: |
+          echo "Deploying the version ${{steps.fetch-version.outputs.version}}" > $GITHUB_STEP_SUMMARY
+
+  plan:
+    name: "Plan deploy to ${{inputs.environment}}"
+    needs: fetch_version
+    runs-on:
+      group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.fetch_version.outputs.version }}
+
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
+          private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Prepare scaleway configuration
+        run: |
+          mkdir -p $HOME/.config/scw
+          echo "${{ secrets[inputs.scw_secret_name] }}" > $HOME/.config/scw/config.yaml
+
+      - name: Create a deploy plan using Terragrunt
+        uses: gruntwork-io/terragrunt-action@v2
+        env:
+          # Configure Git to use installation token
+          INPUT_PRE_EXEC_1: |
+            git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+        with:
+          tf_version: ${{ inputs.tf_version }}
+          tg_version: ${{ inputs.tg_version }}
+          tg_dir: ${{ inputs.tg_working_dir }}
+          tg_command: "run-all plan"
+
+  deploy:
+    name: "Deploy to ${{inputs.environment}}"
+    needs: fetch_version
+    runs-on:
+      group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.fetch_version.outputs.version }}
+
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
+          private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Prepare scaleway configuration
+        run: |
+          mkdir -p $HOME/.config/scw
+          echo "${{ secrets[inputs.scw_secret_name] }}" > $HOME/.config/scw/config.yaml
+
+      - name: Deploy using Terragrunt
+        uses: gruntwork-io/terragrunt-action@v2
+        env:
+          # Configure Git to use installation token
+          INPUT_PRE_EXEC_1: |
+            git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+        with:
+          tf_version: ${{ inputs.tf_version }}
+          tg_version: ${{ inputs.tg_version }}
+          tg_dir: ${{ inputs.tg_working_dir }}
+          tg_command: "run-all apply"
