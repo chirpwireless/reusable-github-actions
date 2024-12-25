@@ -50,14 +50,13 @@ jobs:
         run: |
           # Check if the input matches any of the expected values
           if [[ "${{ github.event.inputs.environment }}" == "live/non-prod/"* ]]; then
-              echo "scw_secret_name=SCW_NONPROD_CONFIG" > $GITHUB_STEP_SUMMARY
+              echo "scw_secret_name=SCW_NONPROD_CONFIG" >> $GITHUB_OUTPUT
           elif [[ "${{ github.event.inputs.environment }}" == "live/prod/"* ]]; then
-              echo "scw_secret_name=SCW_PROD_CONFIG" > $GITHUB_STEP_SUMMARY
+              echo "scw_secret_name=SCW_PROD_CONFIG" >> $GITHUB_OUTPUT
           else
               echo "Unknown environment: ${{ github.event.inputs.environment }}"
               exit 1  # Fail the job if the environment is unknown
           fi
-          cat $GITHUB_STEP_SUMMARY
 
   plan:
     name: "Plan deploy to ${{inputs.environment}}"
