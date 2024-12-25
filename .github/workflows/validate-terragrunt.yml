@@ -1,0 +1,68 @@
+name: Validate a Terraform with Terragrunt
+on:
+  workflow_call:
+    inputs:
+      tg_working_dir:
+        description: "Directory in which Terragrunt will be invoked"
+        type: string
+        required: true
+    outputs:
+      new-version:
+        description: "The new service version"
+        value: ${{ jobs.generate-version.outputs.service-version }}
+
+env:
+  HOME: ${{github.workspace}}
+
+jobs:
+  generate-version:
+    runs-on:
+      group: gke-non-prod
+    outputs:
+      service-version: ${{ steps.version.outputs.new_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
+      - name: "Create a summary"
+        run: |
+          echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
+
+  terragrunt-validate:
+    runs-on:
+      group: gke-non-prod
+    needs: [generate-version]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check terragrunt HCL
+        uses: gruntwork-io/terragrunt-action@v2
+        with:
+          tf_version: "1.10.3"
+          tg_version: "0.71.1"
+          tg_dir: ${{ inputs.tg_working_dir }}
+          tg_command: "validate"
+
+  publish-version:
+    runs-on:
+      group: gke-non-prod
+    needs: [generate-version, terragrunt-validate]
+    permissions:
+      checks: write
+    steps:
+      - name: Publish Version
+        uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
+        with:
+          commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          build-version: ${{ needs.generate-version.outputs.service-version }}
+
+  publish-release:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on:
+      group: gke-non-prod
+    needs: [generate-version, terragrunt-validate]
+    steps:
+      - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
+        with:
+          version: ${{ needs.generate-version.outputs.service-version }}
