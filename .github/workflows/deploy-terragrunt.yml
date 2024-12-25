@@ -7,7 +7,7 @@ on:
         type: string
       environment:
         required: true
-        description: "Environment (k8s namespace)"
+        description: "Environment (Terraform environment)"
         type: string
       tf_version:
         description: "Terraform version to use"
@@ -21,10 +21,6 @@ on:
         description: "Directory in which Terragrunt will be invoked"
         type: string
         required: true
-      scw_secret_name:
-        type: string
-        required: true
-        description: "Name of the Scaleway config secret to use"
 
 env:
   HOME: ${{github.workspace}}
@@ -43,11 +39,30 @@ jobs:
       - run: |
           echo "Deploying the version ${{steps.fetch-version.outputs.version}}" > $GITHUB_STEP_SUMMARY
 
+  setup:
+    runs-on:
+      group: gke-non-prod
+    outputs:
+      scw_secret_name: ${{ steps.setup.outputs.scw_secret_name }}
+    steps:
+      - name: Setup Variables
+        id: setup
+        run: |
+          # Check if the input matches any of the expected values
+          if [[ "${{ github.event.inputs.environment }}" == "live/non-prod/"* ]]; then
+              echo "scw_secret_name=SCW_NONPROD_CONFIG" >> $GITHUB_ENV
+          elif [[ "${{ github.event.inputs.environment }}" == "live/prod/"* ]]; then
+              echo "scw_secret_name=SCW_PROD_CONFIG" >> $GITHUB_ENV
+          else
+              echo "Unknown environment: ${{ github.event.inputs.environment }}"
+              exit 1  # Fail the job if the environment is unknown
+          fi
+
   plan:
     name: "Plan deploy to ${{inputs.environment}}"
-    needs: fetch_version
+    needs: [fetch_version, setup]
     runs-on:
-      group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
+      group: gke-non-prod
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,7 +78,7 @@ jobs:
       - name: Prepare scaleway configuration
         run: |
           mkdir -p $HOME/.config/scw
-          echo "${{ secrets[inputs.scw_secret_name] }}" > $HOME/.config/scw/config.yaml
+          echo "${{ secrets[needs.setup.outputs.scw_secret_name] }}" > $HOME/.config/scw/config.yaml
 
       - name: Create a deploy plan using Terragrunt
         uses: gruntwork-io/terragrunt-action@v2
@@ -79,9 +94,9 @@ jobs:
 
   deploy:
     name: "Deploy to ${{inputs.environment}}"
-    needs: fetch_version
+    needs: [fetch_version, setup, plan]
     runs-on:
-      group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
+      group: gke-non-prod
     environment:
       name: ${{ inputs.environment }}
     steps:
@@ -99,7 +114,7 @@ jobs:
       - name: Prepare scaleway configuration
         run: |
           mkdir -p $HOME/.config/scw
-          echo "${{ secrets[inputs.scw_secret_name] }}" > $HOME/.config/scw/config.yaml
+          echo "${{ secrets[needs.setup.outputs.scw_secret_name] }}" > $HOME/.config/scw/config.yaml
 
       - name: Deploy using Terragrunt
         uses: gruntwork-io/terragrunt-action@v2
