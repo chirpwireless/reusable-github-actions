@@ -42,7 +42,7 @@ jobs:
           tf_version: "1.10.3"
           tg_version: "0.71.1"
           tg_dir: ${{ inputs.tg_working_dir }}
-          tg_command: "validate"
+          tg_command: "run-all validate"
 
   publish-version:
     runs-on:
