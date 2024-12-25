@@ -54,6 +54,8 @@ jobs:
       - name: Check terragrunt HCL
         uses: gruntwork-io/terragrunt-action@v2
         env:
+          # Disable s3 backend for validation
+          TERRAGRUNT_ENABLE_BACKEND: "false"
           # Configure Git to use installation token
           INPUT_PRE_EXEC_1: |
             git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
