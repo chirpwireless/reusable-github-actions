@@ -117,8 +117,10 @@ jobs:
 
       - name: Prepare scaleway configuration
         run: |
+          mkdir -p $HOME/.aws
           mkdir -p $HOME/.config/scw
-          echo "${{ secrets[needs.setup.outputs.scw_secret_name] }}" > $HOME/.config/scw/config.yaml
+          echo "${{ secrets.SCW_AWS_CREDENTIALS }}" > $HOME/.aws/credentials
+          echo "${{ secrets.SCW_CREDENTIALS }}" > $HOME/.config/scw/config.yaml
 
       - name: Deploy using Terragrunt
         uses: gruntwork-io/terragrunt-action@v2
