@@ -1,0 +1,53 @@
+name: "Deploy Terragrunt"
+description: "Deploy Terragunt to the specified environment"
+
+inputs:
+  scw_profile:
+    description: "Git ref (branch, tag) to fetch build version"
+    required: true
+  tf_version:
+    description: "Terraform version to use"
+    required: true
+  tg_version:
+    description: "Terragrunt version to use"
+    required: true
+  tg_working_dir:
+    description: "Directory in which Terragrunt will be invoked"
+    required: true
+  tg_command:
+    description: "Command to execute"
+    required: true
+
+outputs:
+  version:
+    description: "Build version fetched from git ref"
+    value: ${{ steps.fetch-version.outputs.result }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/create-github-app-token@v1
+      id: app-token
+      with:
+        app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
+        private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
+        owner: ${{ github.repository_owner }}
+
+    - uses: gruntwork-io/terragrunt-action@v2
+      env:
+        AWS_PROFILE: ${{ inputs.scw_profile}}
+        SCW_PROFILE: ${{ inputs.scw_profile}}
+        # Configure Git to use installation token
+        INPUT_PRE_EXEC_1: |
+          git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+        # Configure Scaleway and AWS credentials
+        INPUT_PRE_EXEC_2: |
+          mkdir -p $HOME/.aws
+          mkdir -p $HOME/.config/scw
+          echo "${{ secrets.SCW_AWS_CREDENTIALS }}" > $HOME/.aws/credentials
+          echo "${{ secrets.SCW_CREDENTIALS }}" > $HOME/.config/scw/config.yaml
+      with:
+        tf_version: ${{ inputs.tf_version }}
+        tg_version: ${{ inputs.tg_version }}
+        tg_dir: ${{ inputs.tg_working_dir }}
+        tg_command: ${{ inputs.tg_command }}

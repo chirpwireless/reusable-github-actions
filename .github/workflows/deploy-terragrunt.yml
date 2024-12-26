@@ -26,25 +26,22 @@ env:
   HOME: ${{github.workspace}}
 
 jobs:
-  fetch_version:
+  prepare:
     runs-on:
       group: gke-non-prod
     outputs:
       version: ${{steps.fetch-version.outputs.version}}
+      scw_profile: ${{ steps.setup.outputs.scw_profile }}
     steps:
       - id: fetch-version
         uses: chirpwireless/reusable-github-actions/.github/actions/version-fetch@main
         with:
           git-ref: ${{ inputs.version }}
-      - run: |
+
+      - name: "Create a summary"
+        run: |
           echo "Deploying the version ${{steps.fetch-version.outputs.version}}" > $GITHUB_STEP_SUMMARY
 
-  setup:
-    runs-on:
-      group: gke-non-prod
-    outputs:
-      scw_profile: ${{ steps.setup.outputs.scw_profile }}
-    steps:
       - name: Setup profile
         id: setup
         run: |
@@ -60,36 +57,18 @@ jobs:
 
   plan:
     name: "Plan deploy to ${{inputs.environment}}"
-    needs: [fetch_version, setup]
+    needs: [prepare]
     runs-on:
       group: gke-non-prod
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.fetch_version.outputs.version }}
-
-      - uses: actions/create-github-app-token@v1
-        id: app-token
-        with:
-          app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
-          private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
+          ref: ${{ needs.prepare.outputs.version }}
 
       - name: Create a deploy plan using Terragrunt
-        uses: gruntwork-io/terragrunt-action@v2
-        env:
-          AWS_PROFILE: ${{ needs.setup.outputs.scw_profile}}
-          SCW_PROFILE: ${{ needs.setup.outputs.scw_profile}}
-          # Configure Git to use installation token
-          INPUT_PRE_EXEC_1: |
-            git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
-          # Configure Scaleway and AWS credentials
-          INPUT_PRE_EXEC_2: |
-            mkdir -p $HOME/.aws
-            mkdir -p $HOME/.config/scw
-            echo "${{ secrets.SCW_AWS_CREDENTIALS }}" > $HOME/.aws/credentials
-            echo "${{ secrets.SCW_CREDENTIALS }}" > $HOME/.config/scw/config.yaml
+        uses: chirpwireless/reusable-github-actions/.github/actions/deploy-terragrunt@main
         with:
+          scw_profile: ${{ needs.prepare.outputs.scw_profile}}
           tf_version: ${{ inputs.tf_version }}
           tg_version: ${{ inputs.tg_version }}
           tg_dir: ${{ inputs.tg_working_dir }}
@@ -97,7 +76,7 @@ jobs:
 
   deploy:
     name: "Deploy to ${{inputs.environment}}"
-    needs: [fetch_version, setup, plan]
+    needs: [prepare, plan]
     runs-on:
       group: gke-non-prod
     environment:
@@ -105,31 +84,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.fetch_version.outputs.version }}
+          ref: ${{ needs.prepare.outputs.version }}
 
-      - uses: actions/create-github-app-token@v1
-        id: app-token
+      - name: Create a deploy plan using Terragrunt
+        uses: chirpwireless/reusable-github-actions/.github/actions/deploy-terragrunt@main
         with:
-          app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
-          private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-
-      - name: Deploy using Terragrunt
-        uses: gruntwork-io/terragrunt-action@v2
-        env:
-          AWS_PROFILE: ${{ needs.setup.outputs.scw_profile}}
-          SCW_PROFILE: ${{ needs.setup.outputs.scw_profile}}
-          # Configure Git to use installation token
-          INPUT_PRE_EXEC_1: |
-            git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
-          # Configure Scaleway and AWS credentials
-          INPUT_PRE_EXEC_2: |
-            mkdir -p $HOME/.aws
-            mkdir -p $HOME/.config/scw
-            echo "${{ secrets.SCW_AWS_CREDENTIALS }}" > $HOME/.aws/credentials
-            echo "${{ secrets.SCW_CREDENTIALS }}" > $HOME/.config/scw/config.yaml
-        with:
+          scw_profile: ${{ needs.prepare.outputs.scw_profile}}
           tf_version: ${{ inputs.tf_version }}
           tg_version: ${{ inputs.tg_version }}
           tg_dir: ${{ inputs.tg_working_dir }}
-          tg_command: "run-all apply"
+          tg_command: "run-all plan"
