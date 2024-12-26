@@ -42,7 +42,7 @@ jobs:
       - name: Run linter
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.59
+          version: v1.62.2
       - name: Generate Version
         id: version
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
