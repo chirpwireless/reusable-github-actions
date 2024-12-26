@@ -46,13 +46,13 @@ jobs:
         id: setup
         run: |
           # Check if the input matches any of the expected values
-          if [[ "${{ github.event.inputs.environment }}" == "live/non-prod/"* ]]; then
+          if [[ "${{ github.event.inputs.tg_working_dir }}" == "live/non-prod/"* ]]; then
               echo "scw_profile=chirp-non-prod" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event.inputs.environment }}" == "live/prod/"* ]]; then
+          elif [[ "${{ github.event.inputs.tg_working_dir }}" == "live/prod/"* ]]; then
               echo "scw_profile=chirp-prod" >> $GITHUB_OUTPUT
           else
-              echo "Unknown environment: ${{ github.event.inputs.environment }}"
-              exit 1  # Fail the job if the environment is unknown
+              echo "Unknown profile for the path: ${{ github.event.inputs.tg_working_dir }}"
+              exit 1  # Fail the job if the path is unknown
           fi
 
   plan:
