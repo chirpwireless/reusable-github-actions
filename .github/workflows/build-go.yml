@@ -52,14 +52,21 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/create-github-app-token@v1
-        id: app-token
+        id: app-token-chirp-wireless
         with:
           app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
           private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
+          owner: 'chirpwireless'
+      - uses: actions/create-github-app-token@v1
+        id: app-token-chirp-depin
+        with:
+          app-id: ${{ secrets.CHIRP_DEPIN_BUILDER_APP_ID }}
+          private-key: ${{ secrets.CHIRP_DEPIN_BUILDER_PRIVATE_KEY }}
+          owner: 'chirpdepin'
       - name: Configure Git to use installation token
         run: |
-          git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://x-access-token:${{ steps.app-token-chirp-wireless.outputs.token }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://x-access-token:${{ steps.app-token-chirp-depin.outputs.token }}@github.com/".insteadOf "https://github.com/"
           printf "${{ secrets.GITLAB_NETRC }}" > ~/.netrc
       - name: Generate swagger docs
         if: ${{ inputs.generate_docs == true }}
