@@ -25,7 +25,7 @@ on:
 jobs:
   fetch_version:
     runs-on:
-      group: gke-non-prod
+      group: ${{ inputs.environment == 'dev' && 'scw-k8s-dev' || 'gke-non-prod' }}
     outputs:
       version: ${{steps.fetch-version.outputs.version}}
     steps:
@@ -40,7 +40,7 @@ jobs:
     name: "Deploy to ${{inputs.environment}}"
     needs: fetch_version
     runs-on:
-      group: ${{ inputs.environment == 'prod' && 'gke-prod' || 'gke-non-prod'}}
+      group: ${{ inputs.environment == 'prod' && 'gke-prod' || inputs.environment == 'dev' && 'scw-k8s-dev' || 'gke-non-prod' }}
     environment:
       name: ${{ inputs.environment }}
     steps:
