@@ -4,32 +4,27 @@ on:
     outputs:
       new-version:
         description: "The new service version"
-        value: ${{ jobs.generate-version.outputs.service-version }}
+        value: ${{ jobs.terraform-validate.outputs.new_version }}
 
 env:
   HOME: ${{github.workspace}}
 
 jobs:
-  generate-version:
-    runs-on:
-      group: gke-non-prod
-    outputs:
-      service-version: ${{ steps.version.outputs.new_version }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: version
-        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
-      - name: "Create a summary"
-        run: |
-          echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
-
   terraform-validate:
     runs-on:
       group: gke-non-prod
-    needs: [generate-version]
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - id: version
+        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
+
+      - name: "Create a summary"
+        run: |
+          echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -70,25 +65,18 @@ jobs:
             cd -
           done
 
-  publish-version:
-    runs-on:
-      group: gke-non-prod
-    needs: [generate-version, terraform-validate]
-    permissions:
-      checks: write
-    steps:
       - name: Publish Version
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
-          build-version: ${{ needs.generate-version.outputs.service-version }}
+          build-version: ${{ steps.version.outputs.new_version }}
 
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
       group: gke-non-prod
-    needs: [generate-version, terraform-validate]
+    needs: [terraform-validate]
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
         with:
-          version: ${{ needs.generate-version.outputs.service-version }}
+          version: ${{ needs.terraform-validate.outputs.new_version }}
