@@ -71,7 +71,7 @@ jobs:
           scw_profile: ${{ needs.prepare.outputs.scw_profile}}
           tf_version: ${{ inputs.tf_version }}
           tg_version: ${{ inputs.tg_version }}
-          tg_dir: ${{ inputs.tg_working_dir }}
+          tg_working_dir: ${{ inputs.tg_working_dir }}
           tg_command: "run-all plan"
 
   deploy:
@@ -92,5 +92,5 @@ jobs:
           scw_profile: ${{ needs.prepare.outputs.scw_profile}}
           tf_version: ${{ inputs.tf_version }}
           tg_version: ${{ inputs.tg_version }}
-          tg_dir: ${{ inputs.tg_working_dir }}
+          tg_working_dir: ${{ inputs.tg_working_dir }}
           tg_command: "run-all plan"
