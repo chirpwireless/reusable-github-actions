@@ -24,12 +24,12 @@ on:
         value: ${{ jobs.build.outputs.new_version }}
 
 env:
-   HOME: ${{github.workspace}}
+  HOME: ${{github.workspace}}
 
 jobs:
   build:
     runs-on:
-      group: gke-non-prod
+      group: scw-k8s-dev
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
     env:
@@ -45,7 +45,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: '${{ inputs.app_dir }}/go.mod'
+          go-version-file: "${{ inputs.app_dir }}/go.mod"
           cache: false
       - name: Set up gotestfmt
         uses: GoTestTools/gotestfmt-action@v2
@@ -56,13 +56,13 @@ jobs:
         with:
           app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
           private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
-          owner: 'chirpwireless'
+          owner: "chirpwireless"
       - uses: actions/create-github-app-token@v1
         id: app-token-chirp-depin
         with:
           app-id: ${{ secrets.CHIRP_DEPIN_BUILDER_APP_ID }}
           private-key: ${{ secrets.CHIRP_DEPIN_BUILDER_PRIVATE_KEY }}
-          owner: 'chirpdepin'
+          owner: "chirpdepin"
       - name: Configure Git to use installation token
         run: |
           git config --global url."https://x-access-token:${{ steps.app-token-chirp-wireless.outputs.token }}@github.com/chirpwireless/".insteadOf "https://github.com/chirpwireless/"
@@ -111,8 +111,8 @@ jobs:
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
-      group: gke-non-prod
-    needs: [ build ]
+      group: scw-k8s-dev
+    needs: [build]
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
         with:

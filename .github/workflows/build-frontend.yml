@@ -68,7 +68,7 @@ jobs:
 
   publish-version:
     runs-on:
-      group: gke-non-prod
+      group: scw-k8s-dev
     needs: [generate-version, build]
     permissions:
       checks: write
@@ -82,7 +82,7 @@ jobs:
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
-      group: gke-non-prod
+      group: scw-k8s-dev
     needs: [generate-version, build]
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main

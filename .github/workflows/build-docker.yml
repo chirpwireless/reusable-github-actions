@@ -12,12 +12,12 @@ on:
         value: ${{ jobs.generate-version.outputs.service-version }}
 
 env:
-   HOME: ${{github.workspace}}
+  HOME: ${{github.workspace}}
 
 jobs:
   generate-version:
     runs-on:
-      group: gke-non-prod
+      group: scw-k8s-dev
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
@@ -30,8 +30,8 @@ jobs:
 
   build:
     runs-on:
-      group: gke-non-prod
-    needs: [ generate-version ]
+      group: scw-k8s-dev
+    needs: [generate-version]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -52,8 +52,8 @@ jobs:
 
   publish-version:
     runs-on:
-      group: gke-non-prod
-    needs: [ generate-version, build ]
+      group: scw-k8s-dev
+    needs: [generate-version, build]
     permissions:
       checks: write
     steps:
@@ -66,8 +66,8 @@ jobs:
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
-      group: gke-non-prod
-    needs: [ generate-version, build ]
+      group: scw-k8s-dev
+    needs: [generate-version, build]
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
         with:

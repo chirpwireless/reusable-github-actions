@@ -12,7 +12,7 @@ env:
 jobs:
   terraform-validate:
     runs-on:
-      group: gke-non-prod
+      group: scw-k8s-dev
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
     steps:
@@ -74,7 +74,7 @@ jobs:
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
-      group: gke-non-prod
+      group: scw-k8s-dev
     needs: [terraform-validate]
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
