@@ -103,7 +103,7 @@ jobs:
           private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
-      - name: Create a deploy plan using Terragrunt
+      - name: Deploy using Terragrunt
         uses: chirpwireless/reusable-github-actions/.github/actions/deploy-terragrunt@main
         with:
           x_access_token: ${{ steps.app-token.outputs.token }}
@@ -113,4 +113,4 @@ jobs:
           tf_version: ${{ inputs.tf_version }}
           tg_version: ${{ inputs.tg_version }}
           tg_working_dir: ${{ inputs.tg_working_dir }}
-          tg_command: "run-all plan"
+          tg_command: "run-all apply"
