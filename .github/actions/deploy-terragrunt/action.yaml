@@ -26,13 +26,6 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/create-github-app-token@v1
-      id: app-token
-      with:
-        app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
-        private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
-        owner: ${{ github.repository_owner }}
-
     - uses: gruntwork-io/terragrunt-action@v2
       env:
         AWS_PROFILE: ${{ inputs.scw_profile}}
