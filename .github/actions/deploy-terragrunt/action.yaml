@@ -2,8 +2,17 @@ name: "Deploy Terragrunt"
 description: "Deploy Terragunt to the specified environment"
 
 inputs:
+  x_access_token:
+    description: "Application access token for github"
+    required: true
   scw_profile:
-    description: "Git ref (branch, tag) to fetch build version"
+    description: "Scaleway porfile"
+    required: true
+  scw_aws_credentials:
+    description: "Scaleway AWS credentials"
+    required: true
+  scw_credentials:
+    description: "Scaleway credentials"
     required: true
   tf_version:
     description: "Terraform version to use"
@@ -32,13 +41,13 @@ runs:
         SCW_PROFILE: ${{ inputs.scw_profile}}
         # Configure Git to use installation token
         INPUT_PRE_EXEC_1: |
-          git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://x-access-token:${{ inputs.x_access_token }}@github.com/".insteadOf "https://github.com/"
         # Configure Scaleway and AWS credentials
         INPUT_PRE_EXEC_2: |
           mkdir -p $HOME/.aws
           mkdir -p $HOME/.config/scw
-          echo "${{ secrets.SCW_AWS_CREDENTIALS }}" > $HOME/.aws/credentials
-          echo "${{ secrets.SCW_CREDENTIALS }}" > $HOME/.config/scw/config.yaml
+          echo "${{ inputs.scw_aws_credentials }}" > $HOME/.aws/credentials
+          echo "${{ inputs.scw_credentials }}" > $HOME/.config/scw/config.yaml
       with:
         tf_version: ${{ inputs.tf_version }}
         tg_version: ${{ inputs.tg_version }}
