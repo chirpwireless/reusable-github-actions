@@ -39,7 +39,7 @@ jobs:
     name: "Deploy to ${{inputs.environment}}"
     needs: fetch_version
     runs-on:
-      group: ${{ inputs.environment == 'prod' && 'gke-prod' || inputs.environment == 'staging' && 'scw-k8s-staging' || 'scw-k8s-dev' }}
+      group: ${{ inputs.environment == 'prod' && 'gke-prod' || (inputs.environment == 'staging' || inputs.environment == 'kiloiot-staging') && 'scw-k8s-staging' || 'scw-k8s-dev' }}
     environment:
       name: ${{ inputs.environment }}
     steps:
