@@ -50,6 +50,8 @@ jobs:
               echo "scw_profile=chirp-non-prod" >> $GITHUB_OUTPUT
           elif [[ "${{ inputs.tg_working_dir }}" == "live/prod/"* ]]; then
               echo "scw_profile=chirp-prod" >> $GITHUB_OUTPUT
+          elif [[ "${{ inputs.tg_working_dir }}" == "live/kiloiot/"* ]]; then
+              echo "scw_profile=kiloiot" >> $GITHUB_OUTPUT
           else
               echo "Unknown profile for the path: ${{ inputs.tg_working_dir }}"
               exit 1  # Fail the job if the path is unknown
