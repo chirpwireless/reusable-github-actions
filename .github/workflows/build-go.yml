@@ -86,6 +86,7 @@ jobs:
         with:
           version: v1.62.2
           working-directory: ${{ inputs.app_dir }}
+          args: --timeout=10m
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
