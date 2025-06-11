@@ -10,6 +10,9 @@ on:
         description: "Build arguments to pass to Docker build command (e.g., ARG1=value1 ARG2=value2)"
         type: string
         required: false
+    secrets:
+      token:
+        required: false
     outputs:
       new-version:
         description: "The new service version"
