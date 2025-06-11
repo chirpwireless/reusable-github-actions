@@ -10,6 +10,9 @@ on:
         description: "Build arguments to pass to Docker build command (e.g., ARG1=value1 ARG2=value2)"
         type: string
         required: false
+    secrets:
+      fleet_lib_token:
+        required: false
     outputs:
       new-version:
         description: "The new service version"
@@ -53,7 +56,9 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
-          build-args: ${{ inputs.build_args }}
+          build-args: |
+            LIB_TOKEN=${{ secrets.fleet_lib_token }}
+            ${{ inputs.build_args }}
 
   publish-version:
     runs-on:
