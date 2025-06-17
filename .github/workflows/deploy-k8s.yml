@@ -22,6 +22,7 @@ on:
         required: true
         description: "Path to the values file"
         type: string
+
 jobs:
   fetch_version:
     runs-on:
@@ -45,6 +46,8 @@ jobs:
       name: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
       - uses: azure/setup-helm@v4.2.0
       - name: Helm upgrade
         shell: sh

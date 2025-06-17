@@ -44,6 +44,8 @@ jobs:
       name: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
       - name: Deploy using helmfile
         env:
           VERSION: ${{ needs.fetch_version.outputs.version }}
