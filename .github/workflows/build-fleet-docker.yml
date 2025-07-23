@@ -37,7 +37,7 @@ jobs:
 
   build:
     runs-on:
-      group: scw-k8s-dev
+      group: builder
     needs: [generate-version]
     steps:
       - name: Checkout code
