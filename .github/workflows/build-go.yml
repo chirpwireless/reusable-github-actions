@@ -84,7 +84,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         if: ${{ inputs.skip_linter == false }}
         with:
-          version: v1.62.2
+          version: v1.64.8
           working-directory: ${{ inputs.app_dir }}
           args: --timeout=10m
       - name: Set up Docker Buildx
