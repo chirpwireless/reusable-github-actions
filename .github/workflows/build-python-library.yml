@@ -40,11 +40,11 @@ jobs:
       - name: Install dependencies
         run: poetry install
       - name: Run ruff format check
-        run: poetry run ruff format --check . --exclude .local
+        run: poetry run ruff format --check .
       - name: Run ruff linter
-        run: poetry run ruff check . --exclude .local
+        run: poetry run ruff check .
       - name: Run mypy
-        run: poetry run mypy . --exclude .local
+        run: poetry run mypy .
       - name: Run tests
         run: poetry run pytest
       - name: Build package
