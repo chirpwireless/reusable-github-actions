@@ -12,6 +12,11 @@ on:
         type: string
         required: false
         default: "2.0.1"
+      use_package_version:
+        description: "If true, use version from pyproject.toml. If false, use CalVer and update package version."
+        type: boolean
+        required: false
+        default: true
     outputs:
       new-version:
         description: "The new library version"
@@ -39,19 +44,26 @@ jobs:
         run: pip install poetry==${{ inputs.poetry_version }}
       - name: Install dependencies
         run: poetry install
-      - name: Run ruff format check
-        run: poetry run ruff format --check .
-      - name: Run ruff linter
-        run: poetry run ruff check .
-      - name: Run mypy
+      - name: Generate Version
+        if: ${{ inputs.use_package_version == false }}
+        id: calver
+        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
+      - name: Update package version
+        if: ${{ inputs.use_package_version == false }}
+        run: poetry version ${{ steps.calver.outputs.new_version }}
+      - name: Run linter
+        run: |
+          poetry run ruff format --check .
+          poetry run ruff check .
+      - name: Run type check
         run: poetry run mypy .
       - name: Run tests
         run: poetry run pytest --version && poetry run pytest || echo "pytest not installed, skipping tests"
-      - name: Build package
+      - name: Run build
         run: poetry build
-      - name: Generate Version
+      - name: Get package version
         id: version
-        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
+        run: echo "new_version=$(poetry version -s)" >> $GITHUB_OUTPUT
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
