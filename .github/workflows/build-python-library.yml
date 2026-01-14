@@ -1,0 +1,93 @@
+name: Build a Python library
+on:
+  workflow_call:
+    inputs:
+      python_version:
+        description: "Python version to use"
+        type: string
+        required: false
+        default: "3.12"
+      poetry_version:
+        description: "Poetry version to use"
+        type: string
+        required: false
+        default: "2.0.1"
+    outputs:
+      new-version:
+        description: "The new library version"
+        value: ${{ jobs.build.outputs.service-version }}
+
+env:
+  HOME: ${{github.workspace}}
+  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+jobs:
+  build:
+    runs-on:
+      group: builder
+    outputs:
+      service-version: ${{ steps.version.outputs.new_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: "pip"
+      - name: Install Poetry
+        run: pip install poetry==${{ inputs.poetry_version }}
+      - name: Install dependencies
+        run: poetry install
+      - name: Run ruff format check
+        run: poetry run ruff format --check .
+      - name: Run ruff linter
+        run: poetry run ruff check .
+      - name: Run mypy
+        run: poetry run mypy .
+      - name: Run tests
+        run: poetry run pytest
+      - name: Build package
+        run: poetry build
+      - name: Generate Version
+        id: version
+        uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-version:
+    runs-on:
+      group: builder
+    needs: [build]
+    permissions:
+      checks: write
+    steps:
+      - name: Publish Version
+        uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
+        with:
+          commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          build-version: ${{ needs.build.outputs.service-version }}
+
+  publish-release:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on:
+      group: builder
+    needs: [build]
+    permissions:
+      contents: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Create Release with artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build.outputs.service-version }}
+          name: ${{ needs.build.outputs.service-version }}
+          generate_release_notes: true
+          files: dist/*
