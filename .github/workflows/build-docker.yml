@@ -10,6 +10,16 @@ on:
         description: "Build arguments to pass to Docker build command (e.g., ARG1=value1 ARG2=value2)"
         type: string
         required: false
+      dockerfile:
+        description: "Path to the Dockerfile (relative to context)"
+        type: string
+        required: false
+        default: "Dockerfile"
+      context:
+        description: "Build context path"
+        type: string
+        required: false
+        default: "."
     outputs:
       new-version:
         description: "The new service version"
@@ -50,7 +60,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
           build-args: ${{ inputs.build_args }}
