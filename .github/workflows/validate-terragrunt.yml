@@ -46,6 +46,11 @@ jobs:
           private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v4
         with:
