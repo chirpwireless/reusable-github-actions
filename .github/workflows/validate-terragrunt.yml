@@ -59,7 +59,7 @@ jobs:
           tf_version: ${{ inputs.tf_version }}
           tg_version: ${{ inputs.tg_version }}
           tg_dir: ${{ inputs.tg_working_dir }}
-          tg_command: "run-all validate"
+          tg_command: "run --all validate"
 
       - name: Publish Version
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main

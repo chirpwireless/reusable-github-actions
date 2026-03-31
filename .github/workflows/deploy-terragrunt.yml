@@ -84,7 +84,7 @@ jobs:
           tf_version: ${{ inputs.tf_version }}
           tg_version: ${{ inputs.tg_version }}
           tg_working_dir: ${{ inputs.tg_working_dir }}
-          tg_command: "run-all plan"
+          tg_command: "run --all plan"
 
   deploy:
     name: "Deploy to ${{inputs.environment}}"
@@ -115,4 +115,4 @@ jobs:
           tf_version: ${{ inputs.tf_version }}
           tg_version: ${{ inputs.tg_version }}
           tg_working_dir: ${{ inputs.tg_working_dir }}
-          tg_command: "run-all apply"
+          tg_command: "run --all apply"
