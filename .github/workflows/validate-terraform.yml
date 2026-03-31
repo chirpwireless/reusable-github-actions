@@ -27,9 +27,9 @@ jobs:
           echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
 
       - name: Install Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "16"
+          node-version: "24"
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v4
