@@ -5,11 +5,11 @@ on:
       tf_version:
         description: "Terraform version to use"
         type: string
-        default: "1.10.3"
+        default: "1.14.6"
       tg_version:
         description: "Terragrunt version to use"
         type: string
-        default: "0.71.1"
+        default: "0.99.5"
       tg_working_dir:
         description: "Directory in which Terragrunt will be invoked"
         type: string

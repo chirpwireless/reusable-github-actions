@@ -32,7 +32,7 @@ jobs:
           node-version: "16"
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
 
       - name: Find and Validate Modules
         run: |
