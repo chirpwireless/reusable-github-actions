@@ -35,7 +35,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - uses: gruntwork-io/terragrunt-action@v2
+    - uses: gruntwork-io/terragrunt-action@v3
       env:
         AWS_PROFILE: ${{ inputs.scw_profile}}
         SCW_PROFILE: ${{ inputs.scw_profile}}

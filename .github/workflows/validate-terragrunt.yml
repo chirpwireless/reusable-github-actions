@@ -47,7 +47,7 @@ jobs:
           owner: ${{ github.repository_owner }}
 
       - name: Check terragrunt HCL
-        uses: gruntwork-io/terragrunt-action@v2
+        uses: gruntwork-io/terragrunt-action@v3
         env:
           # Disable s3 backend for validation
           TERRAGRUNT_ENABLE_BACKEND: "false"
