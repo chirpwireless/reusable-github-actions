@@ -35,6 +35,11 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v4
+      with:
+        terraform_version: ${{ inputs.tf_version }}
+
     - uses: gruntwork-io/terragrunt-action@v3
       env:
         AWS_PROFILE: ${{ inputs.scw_profile}}
@@ -49,7 +54,7 @@ runs:
           echo "${{ inputs.scw_aws_credentials }}" > $HOME/.aws/credentials
           echo "${{ inputs.scw_credentials }}" > $HOME/.config/scw/config.yaml
       with:
-        tf_version: ${{ inputs.tf_version }}
+        tf_path: "terraform"
         tg_version: ${{ inputs.tg_version }}
         tg_dir: ${{ inputs.tg_working_dir }}
         tg_command: ${{ inputs.tg_command }}
