@@ -80,16 +80,12 @@ jobs:
           go install github.com/swaggo/swag/cmd/swag@v1.16.4
           GOMODCACHE=/tmp/swag-modcache make swagger
       - name: Install dependencies
-        run: |
-          export GOPRIVATE="github.com/useti/zammad-go"
-          go env -w GOPRIVATE="$GOPRIVATE"
-          go get
-          go mod download
+        run: make install
       - name: Run build
         run: make build
       - name: Run tests
         run: |
-          cd ${{ inputs.app_dir}} && go test -json -v ./... -cover -coverprofile=coverage.txt | gotestfmt
+          cd ${{ inputs.app_dir}} && go test -v ./... -cover -coverprofile=coverage.txt
       - name: Run linter
         uses: golangci/golangci-lint-action@v6
         if: ${{ inputs.skip_linter == false }}
