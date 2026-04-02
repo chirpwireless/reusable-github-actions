@@ -47,6 +47,14 @@ jobs:
         with:
           go-version-file: "${{ inputs.app_dir }}/go.mod"
           cache: false
+      - name: Verify Go installation
+        run: |
+          echo "PATH=$PATH"
+          echo "GOPATH=$(go env GOPATH)"
+          echo "GOMODCACHE=$(go env GOMODCACHE)"
+          echo "which go=$(which go)"
+          ls -la $(which go)
+          go version
       - name: Set up gotestfmt
         uses: GoTestTools/gotestfmt-action@v2
         with:
