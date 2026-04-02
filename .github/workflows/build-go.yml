@@ -80,7 +80,11 @@ jobs:
           go install github.com/swaggo/swag/cmd/swag@v1.16.4
           GOMODCACHE=/tmp/swag-modcache make swagger
       - name: Install dependencies
-        run: make install
+        run: |
+          rm -f "$(go env GOPATH)/bin/go" "$(go env GOPATH)/bin/gofmt" 2>/dev/null || true
+          echo "go location: $(which go)"
+          ls -la "$(go env GOPATH)/bin/" 2>/dev/null || true
+          make install
       - name: Run build
         run: make build
       - name: Run tests
