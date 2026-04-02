@@ -85,7 +85,7 @@ jobs:
         run: make build
       - name: Run tests
         run: |
-          cd ${{ inputs.app_dir}} && go test -v ./... -cover -coverprofile=coverage.txt
+          cd ${{ inputs.app_dir}} && go mod download && go test -v ./... -cover -coverprofile=coverage.txt
       - name: Run linter
         uses: golangci/golangci-lint-action@v6
         if: ${{ inputs.skip_linter == false }}
