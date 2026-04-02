@@ -75,9 +75,8 @@ jobs:
       - name: Generate swagger docs
         if: ${{ inputs.generate_docs == true }}
         run: |
-          go install github.com/swaggo/swag/cmd/swag@latest
-          go clean -modcache
-          make swagger
+          go install github.com/swaggo/swag/cmd/swag@v1.16.4
+          GOMODCACHE=/tmp/swag-modcache make swagger
       - name: Install dependencies
         run: make install
       - name: Run build
