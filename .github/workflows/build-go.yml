@@ -71,7 +71,7 @@ jobs:
       - name: Generate swagger docs
         if: ${{ inputs.generate_docs == true }}
         run: |
-          which swag > /dev/null 2>&1 || go install github.com/swaggo/swag/cmd/swag@latest
+          go install github.com/swaggo/swag/cmd/swag@latest
           make swagger
       - name: Install dependencies
         run: make install
