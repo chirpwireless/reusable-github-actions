@@ -72,6 +72,7 @@ jobs:
         if: ${{ inputs.generate_docs == true }}
         run: |
           go install github.com/swaggo/swag/cmd/swag@latest
+          export GOMODCACHE=$(mktemp -d)
           make swagger
       - name: Install dependencies
         run: make install
