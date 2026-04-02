@@ -49,11 +49,9 @@ jobs:
           cache: false
       - name: Verify Go installation
         run: |
-          echo "PATH=$PATH"
-          echo "GOPATH=$(go env GOPATH)"
-          echo "GOMODCACHE=$(go env GOMODCACHE)"
-          echo "which go=$(which go)"
-          ls -la $(which go)
+          # Remove any stale go binary from GOPATH/bin that shadows the real one
+          GOPATH_BIN="$(go env GOPATH)/bin"
+          rm -f "$GOPATH_BIN/go" "$GOPATH_BIN/gofmt" 2>/dev/null || true
           go version
       - name: Set up gotestfmt
         uses: GoTestTools/gotestfmt-action@v2
