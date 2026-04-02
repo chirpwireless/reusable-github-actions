@@ -34,6 +34,8 @@ jobs:
       new_version: ${{ steps.version.outputs.new_version }}
     env:
       docker_tag: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}
+      GOPATH: /tmp/go
+      GOMODCACHE: /tmp/go/pkg/mod
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -78,7 +80,7 @@ jobs:
         if: ${{ inputs.generate_docs == true }}
         run: |
           go install github.com/swaggo/swag/cmd/swag@v1.16.4
-          GOMODCACHE=/tmp/swag-modcache make swagger
+          make swagger
       - name: Install dependencies
         run: make install
       - name: Run build
