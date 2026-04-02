@@ -18,10 +18,6 @@ on:
         description: "A boolean flag to generate Swagger docs"
         type: boolean
         default: false
-      go_version:
-        description: "Go version to install"
-        type: string
-        default: "1.26.1"
     outputs:
       new-version:
         description: "The new service version"
@@ -49,7 +45,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "${{ inputs.go_version }}"
+          go-version-file: "${{ inputs.app_dir }}/go.mod"
           cache: false
       - name: Set up gotestfmt
         uses: GoTestTools/gotestfmt-action@v2
