@@ -44,6 +44,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Remove checkout GitHub auth header
+        run: |
+          git config --local --unset-all http.https://github.com/.extraheader || true
       - id: version
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
       - name: "Create a summary"
