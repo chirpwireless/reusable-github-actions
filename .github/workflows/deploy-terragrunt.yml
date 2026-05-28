@@ -28,7 +28,7 @@ env:
 jobs:
   prepare:
     runs-on:
-      group: scw-k8s-dev
+      group: hetzner-k3s-dev
     outputs:
       version: ${{steps.fetch-version.outputs.version}}
       scw_profile: ${{ steps.setup.outputs.scw_profile }}
@@ -61,7 +61,7 @@ jobs:
     name: "Plan deploy to ${{inputs.environment}}"
     needs: [prepare]
     runs-on:
-      group: scw-k8s-dev
+      group: hetzner-k3s-dev
     steps:
       - uses: actions/checkout@v4
         with:
@@ -90,7 +90,7 @@ jobs:
     name: "Deploy to ${{inputs.environment}}"
     needs: [prepare, plan]
     runs-on:
-      group: scw-k8s-dev
+      group: hetzner-k3s-dev
     environment:
       name: ${{ inputs.environment }}
     steps:

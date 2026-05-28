@@ -24,7 +24,7 @@ env:
 jobs:
   fetch_version:
     runs-on:
-      group: scw-k8s-dev
+      group: hetzner-k3s-dev
     outputs:
       version: ${{steps.fetch-version.outputs.version}}
     steps:
@@ -39,7 +39,7 @@ jobs:
     name: "Deploy to ${{inputs.environment}}"
     needs: fetch_version
     runs-on:
-      group: ${{ (inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod') && 'scw-k8s-prod' || (inputs.environment == 'staging' || inputs.environment == 'kiloiot-staging' || inputs.environment == 'fleet-staging') && 'scw-k8s-staging' || 'scw-k8s-dev' }}
+      group: ${{ (inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod') && 'scw-k8s-prod' || (inputs.environment == 'staging' || inputs.environment == 'kiloiot-staging' || inputs.environment == 'fleet-staging') && 'scw-k8s-staging' || 'hetzner-k3s-dev' }}
     environment:
       name: ${{ inputs.environment }}
     steps:

@@ -25,7 +25,7 @@ env:
 jobs:
   terragrunt-validate:
     runs-on:
-      group: scw-k8s-dev
+      group: hetzner-k3s-dev
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
     steps:
@@ -79,7 +79,7 @@ jobs:
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
-      group: scw-k8s-dev
+      group: hetzner-k3s-dev
     needs: [terragrunt-validate]
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main

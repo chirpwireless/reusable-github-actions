@@ -17,7 +17,7 @@ env:
 jobs:
   generate-version:
     runs-on:
-      group: scw-k8s-dev
+      group: hetzner-k3s-dev
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
@@ -30,7 +30,7 @@ jobs:
 
   build:
     runs-on:
-      group: scw-k8s-dev
+      group: hetzner-k3s-dev
     needs: [generate-version]
     steps:
       - name: Checkout code
@@ -52,7 +52,7 @@ jobs:
 
   publish-version:
     runs-on:
-      group: scw-k8s-dev
+      group: hetzner-k3s-dev
     needs: [generate-version, build]
     permissions:
       checks: write
@@ -66,7 +66,7 @@ jobs:
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
-      group: scw-k8s-dev
+      group: hetzner-k3s-dev
     needs: [generate-version, build]
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
