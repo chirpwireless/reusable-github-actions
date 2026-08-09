@@ -68,7 +68,7 @@ jobs:
             VERSION="$VERSION.${{ matrix.combo.suffix }}"
           fi
 
-          yarn version --new-version "$VERSION"
+          yarn version --no-git-tag-version --new-version "$VERSION"
           yarn publish --no-git-tag-version
 
   publish-version:
