@@ -83,6 +83,8 @@ jobs:
           printf "${{ secrets.GITLAB_NETRC }}" > ~/.netrc
       - name: Generate swagger docs
         if: ${{ inputs.generate_docs == true }}
+        env:
+          GOPROXY: https://proxy.golang.org,direct
         run: |
           go install github.com/swaggo/swag/cmd/swag@v1.16.4
           make swagger
