@@ -14,6 +14,10 @@ on:
         description: "A boolean flag to skip linter checks"
         type: boolean
         default: false
+      golangci_lint_version:
+        description: "golangci-lint version. A v1.x value keeps the v6 action; a v2.x value switches to the v9 action. Pick a release built with Go at least as new as the module's go directive: v2.12.x for go 1.25, v2.13.x for go 1.26"
+        type: string
+        default: "v1.64.8"
       generate_docs:
         description: "A boolean flag to generate Swagger docs"
         type: boolean
@@ -97,9 +101,16 @@ jobs:
           cd ${{ inputs.app_dir}} && go mod download && go test -v ./... -cover -coverprofile=coverage.txt
       - name: Run linter
         uses: golangci/golangci-lint-action@v6
-        if: ${{ inputs.skip_linter == false }}
+        if: ${{ inputs.skip_linter == false && startsWith(inputs.golangci_lint_version, 'v1.') }}
         with:
-          version: v1.64.8
+          version: ${{ inputs.golangci_lint_version }}
+          working-directory: ${{ inputs.app_dir }}
+          args: --timeout=10m
+      - name: Run linter (golangci-lint v2)
+        uses: golangci/golangci-lint-action@v9
+        if: ${{ inputs.skip_linter == false && !startsWith(inputs.golangci_lint_version, 'v1.') }}
+        with:
+          version: ${{ inputs.golangci_lint_version }}
           working-directory: ${{ inputs.app_dir }}
           args: --timeout=10m
       - name: Set up Docker Buildx
