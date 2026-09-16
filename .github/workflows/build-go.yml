@@ -15,7 +15,7 @@ on:
         type: boolean
         default: false
       golangci_lint_version:
-        description: "golangci-lint version. A v1.x value keeps the v6 action; a v2.x value switches to the v8 action, which a go 1.25 module needs"
+        description: "golangci-lint version. A v1.x value keeps the v6 action; a v2.x value switches to the v9 action. Pick a release built with Go at least as new as the module's go directive: v2.12.x for go 1.25, v2.13.x for go 1.26"
         type: string
         default: "v1.64.8"
       generate_docs:
@@ -107,11 +107,12 @@ jobs:
           working-directory: ${{ inputs.app_dir }}
           args: --timeout=10m
       - name: Run linter (golangci-lint v2)
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         if: ${{ inputs.skip_linter == false && !startsWith(inputs.golangci_lint_version, 'v1.') }}
         with:
           version: ${{ inputs.golangci_lint_version }}
           working-directory: ${{ inputs.app_dir }}
+          args: --timeout=10m
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
