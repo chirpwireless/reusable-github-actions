@@ -14,6 +14,10 @@ on:
         description: "Directory in which Terragrunt will be invoked"
         type: string
         required: true
+      tg_parallelism:
+        description: "Max units Terragrunt validates concurrently"
+        type: number
+        default: 2
     outputs:
       new-version:
         description: "The new service version"
@@ -61,6 +65,10 @@ jobs:
         env:
           # Disable s3 backend for validation
           TERRAGRUNT_ENABLE_BACKEND: "false"
+          # Unbounded --all starts every unit's providers at once and the runner times out on plugin start
+          TG_PARALLELISM: ${{ inputs.tg_parallelism }}
+          # One provider download shared by all units instead of one per unit
+          TG_PROVIDER_CACHE: "true"
           # Configure Git to use installation token
           INPUT_PRE_EXEC_1: |
             git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
