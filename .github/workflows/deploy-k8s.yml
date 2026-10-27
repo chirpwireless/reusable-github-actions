@@ -8,7 +8,7 @@ on:
         type: string
         required: true
       version:
-        description: "Git reference (branch, tag) of commit to deploy"
+        description: "Git reference (branch, tag or SHA) of commit to deploy"
         type: string
       environment:
         required: true
@@ -29,11 +29,27 @@ jobs:
       group: hetzner-k3s-dev
     outputs:
       version: ${{steps.fetch-version.outputs.version}}
+      release_sha: ${{steps.verify-release-ref.outputs.sha}}
     steps:
+      - id: verify-release-ref
+        uses: chirpwireless/reusable-github-actions/.github/actions/verify-release-ref@main
+        with:
+          git-ref: ${{ inputs.version }}
+          environment: ${{ inputs.environment }}
       - id: fetch-version
         uses: chirpwireless/reusable-github-actions/.github/actions/version-fetch@main
         with:
-          git-ref: ${{ inputs.version }}
+          git-ref: ${{ inputs.version && steps.verify-release-ref.outputs.sha || inputs.version }}
+      - name: Check the version was built from the verified commit
+        if: inputs.version != '' && steps.verify-release-ref.outputs.sha != ''
+        env:
+          SHA: ${{ steps.verify-release-ref.outputs.sha }}
+          VERSION: ${{ steps.fetch-version.outputs.version }}
+        run: |
+          case "$VERSION" in
+            *"-${SHA:0:7}"*) ;;
+            *) echo "::error::Version '$VERSION' was not built from ${SHA}"; exit 1 ;;
+          esac
       - run: |
           echo "Deploying the version ${{steps.fetch-version.outputs.version}}" > $GITHUB_STEP_SUMMARY
 
@@ -47,7 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ needs.fetch_version.outputs.release_sha || inputs.version }}
       - uses: azure/setup-helm@v4.2.0
       - name: Helm upgrade
         shell: sh

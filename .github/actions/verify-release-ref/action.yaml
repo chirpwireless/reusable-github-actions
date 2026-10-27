@@ -1,0 +1,34 @@
+name: 'Verify Release Ref'
+description: 'Fails a production deployment whose git ref is not contained in main (master in repositories without main).'
+
+inputs:
+  git-ref:
+    description: 'Git ref (branch, tag or SHA) being deployed. Empty means the commit the workflow runs on.'
+    required: false
+    default: ''
+  environment:
+    description: 'Target environment. Only "prod" and "*-prod" environments are checked.'
+    required: true
+  github-token:
+    description: 'The GitHub token'
+    required: true
+    default: ${{ github.token }}
+
+outputs:
+  sha:
+    description: 'The verified commit SHA for a production environment; empty otherwise'
+    value: ${{ steps.verify.outputs.sha }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: verify
+      uses: actions/github-script@v7
+      env:
+        GIT_REF: ${{ inputs.git-ref }}
+        ENVIRONMENT: ${{ inputs.environment }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const { verifyReleaseRef } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
+          await verifyReleaseRef({ github, context, core });
