@@ -38,8 +38,6 @@ jobs:
       new_version: ${{ steps.version.outputs.new_version }}
     env:
       docker_tag: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}
-      GOPATH: /tmp/go
-      GOMODCACHE: /tmp/go/pkg/mod
       GOPRIVATE: ${{ vars.GOPRIVATE }}
       GONOSUMDB: ${{ vars.GONOSUMDB }}
       GOPROXY: ${{ vars.GOPROXY }}
@@ -48,6 +46,22 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+      # /tmp is age-cleaned file by file by systemd-tmpfiles (30d on Ubuntu 24.04), which corrupts a git/module cache kept there.
+      - name: Keep the Go module cache in the runner tool cache
+        env:
+          GOMODCACHE_LIMIT_MB: 10240
+        run: |
+          GOPATH="$RUNNER_TOOL_CACHE/gopath"
+          GOMODCACHE="$RUNNER_TOOL_CACHE/gomodcache"
+          mkdir -p "$GOPATH" "$GOMODCACHE"
+          used_mb=$(du -sm "$GOMODCACHE" | cut -f1)
+          if [ "$used_mb" -gt "$GOMODCACHE_LIMIT_MB" ]; then
+            echo "module cache is ${used_mb} MB, above ${GOMODCACHE_LIMIT_MB} MB: resetting it"
+            chmod -R u+w "$GOMODCACHE" && rm -rf "$GOMODCACHE" && mkdir -p "$GOMODCACHE"
+          fi
+          touch "$GOPATH" "$GOMODCACHE"
+          echo "GOPATH=$GOPATH" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=$GOMODCACHE" >> "$GITHUB_ENV"
       - id: version
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
       - name: "Create a summary"
@@ -87,8 +101,6 @@ jobs:
           printf "${{ secrets.GITLAB_NETRC }}" > ~/.netrc
       - name: Generate swagger docs
         if: ${{ inputs.generate_docs == true }}
-        env:
-          GOPROXY: https://proxy.golang.org,direct
         run: |
           go install github.com/swaggo/swag/cmd/swag@v1.16.4
           make swagger
