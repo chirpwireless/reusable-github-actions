@@ -1,3 +1,5 @@
+const MAIN_BUILD_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7}$/;
+
 async function fetchRelease({github, context, core}) {
     const repo = context.repo.repo;
     core.info(`Fetching version from latest release in ${repo}...`);
@@ -28,7 +30,9 @@ async function fetchVersionFromCheck({github, context, core}) {
         return undefined;
     }
 
-    const versionCheck = res.data.check_runs[0];
+    // A pull request build publishes its merge-ref image on the PR head commit, so a main commit can carry both.
+    const mainBuild = res.data.check_runs.find((run) => MAIN_BUILD_VERSION.test(run.output?.title || ''));
+    const versionCheck = mainBuild || res.data.check_runs[0];
     core.info(`VERSION CHECK: ${JSON.stringify(versionCheck)}`);
 
     const version = versionCheck.output.title;

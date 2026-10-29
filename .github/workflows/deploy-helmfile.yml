@@ -49,14 +49,20 @@ jobs:
         with:
           ref: ${{ inputs.version }}
           fetch-depth: ${{ env.IS_PROD != 'true' && 1 || 0 }}
-      - name: Production deploys only commits from the main branch
+      - name: Production deploys only commits and images from the main branch
         if: env.IS_PROD == 'true'
         shell: sh
+        env:
+          VERSION: ${{ needs.fetch_version.outputs.version }}
         run: |
           base=main
           git rev-parse -q --verify refs/remotes/origin/main >/dev/null || base=master
           if ! git merge-base --is-ancestor HEAD "refs/remotes/origin/$base"; then
             echo "::error::$(git rev-parse --short HEAD) is not on $base: production deploys only commits from $base"
+            exit 1
+          fi
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7}$' || ! git merge-base --is-ancestor "${VERSION##*-}" "refs/remotes/origin/$base"; then
+            echo "::error::image $VERSION is not a $base build: production deploys only images built from $base"
             exit 1
           fi
       - name: Deploy using helmfile
