@@ -23,6 +23,8 @@ async function fetchVersionFromCheck({github, context, core}) {
         ref: GIT_REF,
         status: 'completed',
         check_name: CHECK_NAME,
+        filter: 'all',
+        per_page: 100,
     });
 
     if (res.data.total_count === 0) {
