@@ -22,6 +22,10 @@ on:
         description: "A boolean flag to generate Swagger docs"
         type: boolean
         default: false
+      race:
+        description: "Run the tests with the race detector (needs cgo and a C compiler on the runner)"
+        type: boolean
+        default: false
     outputs:
       new-version:
         description: "The new service version"
@@ -98,7 +102,9 @@ jobs:
         run: make build
       - name: Run tests
         run: |
-          cd ${{ inputs.app_dir}} && go mod download && go test -v ./... -cover -coverprofile=coverage.txt
+          cd ${{ inputs.app_dir}} && go mod download && go test -v ${{ inputs.race && '-race' || '' }} ./... -cover -coverprofile=coverage.txt
+        env:
+          CGO_ENABLED: ${{ inputs.race && '1' || '' }}
       - name: Run linter
         uses: golangci/golangci-lint-action@v6
         if: ${{ inputs.skip_linter == false && startsWith(inputs.golangci_lint_version, 'v1.') }}
