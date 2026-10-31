@@ -121,6 +121,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to AWS ECR (optional)
+        id: ecr
+        uses: chirpwireless/reusable-github-actions/.github/actions/ecr-login@main
+        with:
+          role-arn: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
+          registry: ${{ vars.AWS_ECR_REGISTRY }}
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -129,7 +135,15 @@ jobs:
           tags: ${{ env.docker_tag }}:${{ steps.version.outputs.new_version }}
           cache-from: type=registry,ref=${{ env.docker_tag }}:buildcache
           cache-to: type=registry,ref=${{ env.docker_tag }}:buildcache,mode=max
+      - name: Copy the image to AWS ECR (optional)
+        uses: chirpwireless/reusable-github-actions/.github/actions/ecr-copy@main
+        with:
+          source: ${{ env.docker_tag }}:${{ steps.version.outputs.new_version }}
+          registry: ${{ steps.ecr.outputs.registry }}
+          target: ${{ steps.ecr.outputs.registry }}/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ steps.version.outputs.new_version }}
       - name: Publish Version
+        # See publish-version in build-docker.yml: a release PR builds ghcr only.
+        if: ${{ !(vars.AWS_ECR_REGISTRY != '' && github.event_name == 'pull_request' && contains(fromJSON('["main","master","develop","dev","test"]'), github.head_ref)) }}
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}

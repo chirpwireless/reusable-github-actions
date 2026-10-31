@@ -59,14 +59,28 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to AWS ECR (optional)
+        id: ecr
+        uses: chirpwireless/reusable-github-actions/.github/actions/ecr-login@main
+        with:
+          role-arn: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
+          registry: ${{ vars.AWS_ECR_REGISTRY }}
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
+      - name: Copy the image to AWS ECR (optional)
+        uses: chirpwireless/reusable-github-actions/.github/actions/ecr-copy@main
+        with:
+          source: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
+          registry: ${{ steps.ecr.outputs.registry }}
+          target: ${{ steps.ecr.outputs.registry }}/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
 
   publish-version:
+    # A release PR (integration branch into integration branch) builds ghcr only; its version would be picked up by dev Auto Deploy with no ECR image behind it. Applies only where ECR is configured.
+    if: ${{ !(vars.AWS_ECR_REGISTRY != '' && github.event_name == 'pull_request' && contains(fromJSON('["main","master","develop","dev","test"]'), github.head_ref)) }}
     runs-on:
       group: hetzner-k3s-dev
     needs: [generate-version, build]

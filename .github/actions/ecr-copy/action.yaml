@@ -1,0 +1,50 @@
+name: 'EcrCopy'
+description: >-
+  Copies the image just pushed to ghcr into ECR (registry to registry, no rebuild). A failed or skipped copy never fails the build,
+  except on an integration branch of a service whose deploy/ values already name an ECR registry: there a missing ECR image
+  would only surface at deploy time, so the build fails instead.
+
+inputs:
+  source:
+    description: "ghcr image reference with tag"
+    required: true
+  target:
+    description: "ECR image reference with tag"
+    required: true
+  registry:
+    description: "Output `registry` of the ecr-login step; empty when the login did not happen"
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      env:
+        SOURCE: ${{ inputs.source }}
+        TARGET: ${{ inputs.target }}
+        REGISTRY: ${{ inputs.registry }}
+      run: |
+        copied=false
+        if [ -n "$REGISTRY" ]; then
+          if docker buildx imagetools inspect "$TARGET" >/dev/null 2>&1; then
+            echo "$TARGET already exists in ECR (tags are immutable): nothing to copy"
+            exit 0
+          fi
+          if docker buildx imagetools create --tag "$TARGET" "$SOURCE"; then
+            copied=true
+          else
+            echo "::warning::copy of $SOURCE to ECR failed; the image is in ghcr only"
+          fi
+        fi
+        if [ "$copied" = true ]; then
+          exit 0
+        fi
+        case "$GITHUB_REF" in
+          refs/heads/main|refs/heads/master|refs/heads/develop|refs/heads/dev|refs/heads/test) integration=true ;;
+          *) integration=false ;;
+        esac
+        if [ "$integration" = true ] && grep -rhE '\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com/chirpwireless/' deploy/ 2>/dev/null | grep -qvE '^\s*#'; then
+          echo "::error::deploy/ pulls this service from ECR but the image was not copied there; fix the ECR setup (id-token permission, AWS_ECR_* variables, role) and re-run"
+          exit 1
+        fi
+        echo "ECR copy skipped"
