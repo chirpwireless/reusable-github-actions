@@ -114,6 +114,24 @@ class MigrateTest(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertIn("no permissions block", out)
 
+    def test_workflows_only_leaves_deploy_untouched(self):
+        rc, out, files = run({
+            ".github/workflows/pipeline-build.yml": BUILD,
+            "deploy/values/common.yaml": "image:\n  repository: ghcr.io/chirpwireless/svc\n",
+        }, extra=("--workflows-only",))
+        self.assertEqual(rc, 0, out)
+        self.assertIn("ghcr.io/chirpwireless/svc", files["deploy/values/common.yaml"])
+        self.assertIn("id-token: write", files[".github/workflows/pipeline-build.yml"])
+
+    def test_deploy_only_leaves_workflow_untouched(self):
+        rc, out, files = run({
+            ".github/workflows/pipeline-build.yml": BUILD,
+            "deploy/values/common.yaml": "image:\n  repository: ghcr.io/chirpwireless/svc\n",
+        }, extra=("--deploy-only",))
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("id-token", files[".github/workflows/pipeline-build.yml"])
+        self.assertIn(".dkr.ecr.", files["deploy/values/common.yaml"])
+
     def test_second_run_is_a_clean_no_op(self):
         files = {
             ".github/workflows/pipeline-build.yml": BUILD,

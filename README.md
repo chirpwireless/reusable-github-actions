@@ -17,4 +17,4 @@ missing copy fails the build, because the deploy would otherwise fail later with
 The AWS side only trusts jobs that run these workflows from `reusable-github-actions@main`.
 
 `scripts/ecr-migrate-service.py` makes the per-service edits (every `ghcr.io/chirpwireless/` image under `deploy/`, and
-`id-token: write` in every build job). Run its tests with `python3 -I scripts/tests/test_ecr_migrate_service.py`.
+`id-token: write` in every build job). Images built by a service's own job are copied with the reusable `build-ecr-copy.yml` workflow (inputs `service_name`, `version`). Run the script tests with `python3 -I scripts/tests/test_ecr_migrate_service.py`.

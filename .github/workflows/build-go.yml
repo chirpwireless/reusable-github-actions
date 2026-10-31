@@ -142,6 +142,8 @@ jobs:
           registry: ${{ steps.ecr.outputs.registry }}
           target: ${{ steps.ecr.outputs.registry }}/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ steps.version.outputs.new_version }}
       - name: Publish Version
+        # See publish-version in build-docker.yml: a release PR builds ghcr only.
+        if: ${{ !(vars.AWS_ECR_REGISTRY != '' && github.event_name == 'pull_request' && contains(fromJSON('["main","master","develop","dev","test"]'), github.head_ref)) }}
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}

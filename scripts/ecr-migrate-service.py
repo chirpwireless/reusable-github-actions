@@ -13,6 +13,9 @@ It edits files in place and never commits, pushes or opens a PR. It exits non-ze
   - nothing changed and the checkout does not already point at ECR
   - a non-comment ghcr.io/chirpwireless reference is left under deploy/
   - a build job has no permissions block, or id-token is set to something other than write
+
+A failed run may leave the checkout half edited: `git restore .` before retrying.
+--deploy-only / --workflows-only do just one of the two parts (the other is read for its checks, not written).
 """
 import argparse
 import re
@@ -142,6 +145,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--registry", required=True, help="ECR registry host, e.g. <account>.dkr.ecr.eu-central-1.amazonaws.com")
     ap.add_argument("--registry-stack", required=True, type=Path, help="hetzner-k8s live/ecr-registry/terragrunt.hcl (the repository list)")
+    only = ap.add_mutually_exclusive_group()
+    only.add_argument("--deploy-only", action="store_true", help="edit deploy/ only")
+    only.add_argument("--workflows-only", action="store_true", help="edit .github/workflows only")
     ap.add_argument("--dry-run", action="store_true", help="report only; skips the leftover scan")
     ap.add_argument("--extra-image", action="append", default=[], help="image referenced under deploy/ whose own workflow already copies it to ECR")
     ap.add_argument("paths", nargs="+", type=Path, help="service checkouts")
@@ -151,11 +157,16 @@ def main() -> int:
     rc = 0
     for repo in args.paths:
         print(repo)
-        r1, e1, images = migrate_deploy(repo, args.registry, known, args.dry_run)
-        r2, e2, services = migrate_workflows(repo, known, args.dry_run)
+        r1, e1, images = migrate_deploy(repo, args.registry, known, args.dry_run or args.workflows_only)
+        r2, e2, services = migrate_workflows(repo, known, args.dry_run or args.deploy_only)
+        if args.workflows_only:
+            r1, e1, images = [], [], set()
+        if args.deploy_only:
+            r2, e2 = [], []
         reports, errors = r1 + r2, e1 + e2
-        for image in sorted(images - services - set(args.extra_image)):
-            errors.append(f"image '{image}' is not built by a shared build job here; its own workflow must copy it to ECR (then pass --extra-image {image})")
+        if not args.workflows_only:
+            for image in sorted(images - services - set(args.extra_image)):
+                errors.append(f"image '{image}' is not built by a shared build job here; its own workflow must copy it to ECR (then pass --extra-image {image})")
         for line in reports:
             print(f"  {line}")
         for line in errors:

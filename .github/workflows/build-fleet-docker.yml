@@ -73,6 +73,8 @@ jobs:
           target: ${{ steps.ecr.outputs.registry }}/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
 
   publish-version:
+    # A release PR (integration branch into integration branch) builds ghcr only; its version would be picked up by dev Auto Deploy with no ECR image behind it. Applies only where ECR is configured.
+    if: ${{ !(vars.AWS_ECR_REGISTRY != '' && github.event_name == 'pull_request' && contains(fromJSON('["main","master","develop","dev","test"]'), github.head_ref)) }}
     runs-on:
       group: hetzner-k3s-dev
     needs: [generate-version, build]
