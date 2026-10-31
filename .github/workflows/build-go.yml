@@ -121,12 +121,20 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to AWS ECR (optional)
+        id: ecr
+        uses: chirpwireless/reusable-github-actions/.github/actions/ecr-login@main
+        with:
+          role-arn: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
+          registry: ${{ vars.AWS_ECR_REGISTRY }}
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ env.docker_tag }}:${{ steps.version.outputs.new_version }}
+          tags: |
+            ${{ env.docker_tag }}:${{ steps.version.outputs.new_version }}
+            ${{ steps.ecr.outputs.registry != '' && format('{0}/{1}/{2}:{3}', steps.ecr.outputs.registry, github.repository_owner, inputs.service_name, steps.version.outputs.new_version) || '' }}
           cache-from: type=registry,ref=${{ env.docker_tag }}:buildcache
           cache-to: type=registry,ref=${{ env.docker_tag }}:buildcache,mode=max
       - name: Publish Version
