@@ -61,12 +61,16 @@ jobs:
         with:
           context: .
           push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
-            ${{ steps.ecr.outputs.registry != '' && format('{0}/{1}/{2}:{3}', steps.ecr.outputs.registry, github.repository_owner, inputs.service_name, needs.generate-version.outputs.service-version) || '' }}
+          tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
           build-args: |
             LIB_TOKEN=${{ secrets.fleet_lib_token }}
             ${{ inputs.build_args }}
+      - name: Copy the image to AWS ECR (optional)
+        uses: chirpwireless/reusable-github-actions/.github/actions/ecr-copy@main
+        with:
+          source: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
+          registry: ${{ steps.ecr.outputs.registry }}
+          target: ${{ steps.ecr.outputs.registry }}/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
 
   publish-version:
     runs-on:

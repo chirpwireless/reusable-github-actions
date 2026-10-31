@@ -1,6 +1,7 @@
 name: 'EcrLogin'
 description: >-
   Logs in to AWS ECR through GitHub OIDC so a build can push an image there next to ghcr.
+  Only on pushes to integration branches (main, master, develop, dev, test); pull-request images stay on ghcr.
   A no-op, and never a failure, when the calling workflow has no id-token: write permission,
   the role or registry is not configured, or AWS rejects the login.
 
@@ -29,23 +30,27 @@ runs:
         ROLE_ARN: ${{ inputs.role-arn }}
         REGISTRY: ${{ inputs.registry }}
       run: |
-        if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] && [ -n "$ROLE_ARN" ] && [ -n "$REGISTRY" ]; then
+        case "$GITHUB_EVENT_NAME:$GITHUB_REF" in
+          push:refs/heads/main|push:refs/heads/master|push:refs/heads/develop|push:refs/heads/dev|push:refs/heads/test|workflow_dispatch:refs/heads/main|workflow_dispatch:refs/heads/master|workflow_dispatch:refs/heads/develop|workflow_dispatch:refs/heads/dev|workflow_dispatch:refs/heads/test) on_branch=true ;;
+          *) on_branch=false ;;
+        esac
+        if [ "$on_branch" = true ] && [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] && [ -n "$ROLE_ARN" ] && [ -n "$REGISTRY" ]; then
           echo "enabled=true" >> "$GITHUB_OUTPUT"
         else
-          echo "ECR push skipped: id-token permission, role or registry is not set"
+          echo "ECR copy skipped: not an integration branch push, or id-token permission, role or registry is not set"
           echo "enabled=false" >> "$GITHUB_OUTPUT"
         fi
     - id: aws
       if: steps.gate.outputs.enabled == 'true'
       continue-on-error: true
-      uses: aws-actions/configure-aws-credentials@v4
+      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
       with:
         role-to-assume: ${{ inputs.role-arn }}
         aws-region: ${{ inputs.region }}
     - id: login
       if: steps.aws.outcome == 'success'
       continue-on-error: true
-      uses: aws-actions/amazon-ecr-login@v2
+      uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
     - id: result
       shell: bash
       env:
