@@ -11,7 +11,7 @@ env:
 
 jobs:
   terraform-validate:
-    # The dev cluster runners reach only GitHub and GitLab; Terraform needs its release and provider sites.
+    # Terraform needs its release and provider sites, which the self-hosted runners do not reach.
     runs-on: ubuntu-24.04
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
