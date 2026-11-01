@@ -11,8 +11,8 @@ env:
 
 jobs:
   terraform-validate:
-    runs-on:
-      group: hetzner-k3s-dev
+    # The dev cluster runners reach only GitHub and GitLab; Terraform needs its release and provider sites.
+    runs-on: ubuntu-24.04
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
     steps:
