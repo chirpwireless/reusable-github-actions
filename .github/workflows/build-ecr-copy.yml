@@ -1,0 +1,44 @@
+name: Copy a built image from ghcr to AWS ECR
+# The push role trusts jobs of this file alone, on protected branches. Nothing here may run code of the calling service:
+# no checkout, and the runner is GitHub-hosted because the builder VMs are shared with service builds.
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: "Image name under the organization, as in ghcr.io/<owner>/<image>"
+        type: string
+        required: true
+      version:
+        description: "Image tag"
+        type: string
+        required: true
+      digest:
+        description: "Digest of the pushed image, sha256:<hex>"
+        type: string
+        required: true
+
+jobs:
+  copy:
+    if: contains(fromJSON('["refs/heads/main","refs/heads/master","refs/heads/develop","refs/heads/dev"]'), github.ref)
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+      packages: read
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to AWS ECR
+        uses: chirpwireless/reusable-github-actions/.github/actions/ecr-login@main
+        with:
+          role-arn: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
+      - name: Copy the image to AWS ECR
+        uses: chirpwireless/reusable-github-actions/.github/actions/ecr-copy@main
+        with:
+          image: ${{ inputs.image }}
+          version: ${{ inputs.version }}
+          digest: ${{ inputs.digest }}
+          registry: ${{ vars.AWS_ECR_REGISTRY }}

@@ -1,0 +1,7 @@
+{
+  "LandingKilo": ["kilo-landing"],
+  "ai-assistant-service": ["ai-assistant-service-kg-bundle"],
+  "docker": ["docker/actions-deployer-runner-image"],
+  "kilo-service-center-ece": ["kc-api-docs-ece", "kc-core-ece", "kc-gateway-ece", "kc-identity-ece", "kc-web-ece"],
+  "public-api-authz": ["public-api-docs"]
+}
