@@ -25,10 +25,15 @@ ecr-copy-build:
   protected branches of the organization, so a job that runs service code cannot assume it.
 - The job runs on a GitHub-hosted runner and checks nothing out: the builder VMs are shared with service builds.
 - It runs on `main`, `master`, `develop` and `dev` and is skipped elsewhere, so pull request images stay on ghcr.
+  `dev` is trusted per repository in `hetzner-k8s/live/ecr-push-role`: another repository building on `dev` gets a red job
+  and no deploy until it has a line there.
 - A repository writes the image named after it. Any other image needs a line in
   `.github/actions/ecr-copy/allowed-images.json`, because the role itself can write the whole namespace.
-- Any failure fails the build, and Auto Deploy runs only after a successful Build workflow.
-- Services that do not call this workflow are not affected.
+- A failed copy fails the build of that branch, and Auto Deploy does not start from it. A pull request build of the same
+  commit still can: it skips the copy, succeeds, and `version-fetch` then picks the branch build, so the deploy fails on the
+  missing image and helmfile rolls back.
+- A service that does not call this workflow gets no copy job, but every build and deploy uses `version-publish` and
+  `version-fetch` at `@main`, so a merge here changes those two for all services at once.
 
 Tests: `python3 -I scripts/tests/test_ecr_migrate_service.py`, `python3 -I scripts/tests/test_ecr_copy.py`,
 `node --test .github/actions/version-fetch/script.test.js`.
