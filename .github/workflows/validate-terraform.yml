@@ -44,6 +44,14 @@ jobs:
             cd -
           done
 
+      - name: Run Terraform tests
+        run: |
+          find modules -type f -name "*.tftest.hcl" -path "*/tests/*" -exec dirname {} \; | sed 's|/tests$||' | sort -u | while read -r dir; do
+            echo "Testing Terraform module in $dir"
+            terraform -chdir="$dir" init -backend=false
+            terraform -chdir="$dir" test
+          done
+
       - name: Check Formatting
         run: |
           find modules -type f -name "*.tf" | while read -r file; do
