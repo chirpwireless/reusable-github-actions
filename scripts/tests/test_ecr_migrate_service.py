@@ -7,7 +7,7 @@ from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parent.parent / "ecr-migrate-service.py"
 REGISTRY = "123456789012.dkr.ecr.eu-central-1.amazonaws.com"
-STACK = 'inputs = {\n  repository_names = [\n    "svc",\n    "authz-proxy",\n    "other",\n  ]\n}\n'
+PUSH_REPOS = '{"repos": {"svc": {"refs": ["refs/heads/main"], "images": ["svc", "authz-proxy", "other"]}}}'
 
 BUILD = """\
 name: Build
@@ -26,14 +26,14 @@ jobs:
 def run(files, extra=()):
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
-        (root / "stack.hcl").write_text(STACK)
+        (root / "push-repos.json").write_text(PUSH_REPOS)
         repo = root / "repo"
         for name, body in files.items():
             p = repo / name
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(textwrap.dedent(body) if not body.startswith("name:") else body)
         proc = subprocess.run(
-            [sys.executable, "-I", str(SCRIPT), "--registry", REGISTRY, "--registry-stack", str(root / "stack.hcl"), *extra, str(repo)],
+            [sys.executable, "-I", str(SCRIPT), "--registry", REGISTRY, "--push-repos", str(root / "push-repos.json"), *extra, str(repo)],
             capture_output=True, text=True,
         )
         out = {n: (repo / n).read_text() for n in files}
@@ -91,7 +91,7 @@ class MigrateTest(unittest.TestCase):
             "deploy/values/common.yaml": "image:\n  repository: ghcr.io/chirpwireless/not-in-the-list\n",
         })
         self.assertEqual(rc, 1)
-        self.assertIn("not a repository", out)
+        self.assertIn("not in the list of ECR images", out)
 
     def test_unknown_service_name_fails(self):
         rc, out, _ = run({
@@ -153,7 +153,7 @@ class MigrateTest(unittest.TestCase):
             "charts/svc/values.yaml": "image:\n  repository: ghcr.io/chirpwireless/unknown\n",
         }, extra=("--deploy-dir", "charts"))
         self.assertEqual(rc, 1)
-        self.assertIn("image 'unknown' is not a repository", out)
+        self.assertIn("image 'unknown' is not in the list of ECR images", out)
 
     def test_workflow_without_final_newline(self):
         rc, out, files = run({
@@ -188,12 +188,12 @@ class MigrateTest(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / "stack.hcl").write_text(STACK)
+            (root / "push-repos.json").write_text(PUSH_REPOS)
             repo = root / "repo"
             for n, b in files.items():
                 (repo / n).parent.mkdir(parents=True, exist_ok=True)
                 (repo / n).write_text(b)
-            cmd = [sys.executable, "-I", str(SCRIPT), "--registry", REGISTRY, "--registry-stack", str(root / "stack.hcl"), str(repo)]
+            cmd = [sys.executable, "-I", str(SCRIPT), "--registry", REGISTRY, "--push-repos", str(root / "push-repos.json"), str(repo)]
             self.assertEqual(subprocess.run(cmd, capture_output=True, text=True).returncode, 0)
             second = subprocess.run(cmd, capture_output=True, text=True)
             self.assertEqual(second.returncode, 0, second.stdout)

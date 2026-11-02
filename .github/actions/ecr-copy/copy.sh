@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${IMAGE:?}" "${VERSION:?}" "${DIGEST:?}" "${REGISTRY:?}" "${GITHUB_REPOSITORY:?}"
+: "${IMAGE:?}" "${VERSION:?}" "${DIGEST:?}" "${REGISTRY:?}" "${GITHUB_REPOSITORY:?}" "${GITHUB_REF:?}"
 
 owner=${GITHUB_REPOSITORY%%/*}
-repo=${GITHUB_REPOSITORY#*/}
-allowed="$(dirname "$0")/allowed-images.json"
 
 fail() {
   echo "::error::$1"
@@ -16,10 +14,16 @@ fail() {
 [[ $VERSION =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]] || fail "tag '$VERSION' is not valid"
 [[ $DIGEST =~ ^sha256:[0-9a-f]{64}$ ]] || fail "digest '$DIGEST' is not a sha256 digest"
 
-# The role can write every repository of the namespace, so this list is what stops one service from writing another's image.
-if [ "$IMAGE" != "$repo" ] && ! jq -e --arg repo "$repo" --arg image "$IMAGE" '.[$repo] // [] | index($image) != null' "$allowed" >/dev/null; then
-  fail "$GITHUB_REPOSITORY may not write image '$IMAGE'; add it to .github/actions/ecr-copy/allowed-images.json in reusable-github-actions"
-fi
+# Tags are immutable and production takes only main-form tags, so another branch must not be able to write one.
+case $GITHUB_REF in
+  refs/heads/main | refs/heads/master) ;;
+  refs/heads/?*)
+    branch=${GITHUB_REF#refs/heads/}
+    suffix=${branch//[^a-zA-Z0-9]/-}
+    [[ $VERSION == *-"$suffix" ]] || fail "a build of $branch may only write tags ending in -$suffix, not '$VERSION'"
+    ;;
+  *) fail "$GITHUB_REF is not a branch" ;;
+esac
 
 ecr_repo="$owner/$IMAGE"
 source_ref="ghcr.io/$owner/$IMAGE@$DIGEST"

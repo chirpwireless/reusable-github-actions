@@ -1,4 +1,3 @@
-import json
 import os
 import stat
 import subprocess
@@ -31,7 +30,7 @@ def executable(path, body):
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
 
-def copy(image="svc", repo="chirpwireless/svc", digest=DIGEST, version="2026.111.1-abc1234", present=None, env=None):
+def copy(image="svc", digest=DIGEST, version="2026.111.1-abc1234", ref="refs/heads/main", present=None, env=None):
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         bin_dir = root / "bin"
@@ -51,7 +50,8 @@ def copy(image="svc", repo="chirpwireless/svc", digest=DIGEST, version="2026.111
             "VERSION": version,
             "DIGEST": digest,
             "REGISTRY": REGISTRY,
-            "GITHUB_REPOSITORY": repo,
+            "GITHUB_REPOSITORY": "chirpwireless/svc",
+            "GITHUB_REF": ref,
             **(env or {}),
         }
         proc = subprocess.run(["bash", str(ACTION / "copy.sh")], capture_output=True, text=True, env=full_env)
@@ -90,24 +90,46 @@ class CopyTest(unittest.TestCase):
         self.assertNotEqual(rc, 0)
         self.assertNotIn("docker", calls)
 
-    def test_another_services_image_is_refused(self):
-        rc, out, calls = copy(image="authz-proxy", repo="chirpwireless/bff", env={"COPY_RESULT": DIGEST})
+    def test_develop_writes_its_own_tag(self):
+        rc, out, _ = copy(version="2026.111.1-abc1234-develop", ref="refs/heads/develop", env={"COPY_RESULT": DIGEST})
+        self.assertEqual(rc, 0, out)
+
+    def test_dev_writes_its_own_tag(self):
+        rc, out, _ = copy(version="2026.111.1-abc1234-dev", ref="refs/heads/dev", env={"COPY_RESULT": DIGEST})
+        self.assertEqual(rc, 0, out)
+
+    def test_other_branches_cannot_write_a_production_tag(self):
+        for ref in ("refs/heads/develop", "refs/heads/dev"):
+            rc, out, calls = copy(version="2026.111.1-abc1234", ref=ref, env={"COPY_RESULT": DIGEST})
+            self.assertEqual(rc, 1, ref)
+            self.assertIn("may only write tags ending in", out)
+            self.assertEqual(calls, "")
+
+    def test_a_branch_cannot_write_the_tag_of_another_branch(self):
+        rc, out, calls = copy(version="2026.111.1-abc1234-develop", ref="refs/heads/dev")
         self.assertEqual(rc, 1)
-        self.assertIn("may not write image", out)
         self.assertEqual(calls, "")
 
-    def test_listed_extra_image_is_accepted(self):
-        rc, out, _ = copy(image="public-api-docs", repo="chirpwireless/public-api-authz", env={"COPY_RESULT": DIGEST})
+    def test_branch_name_is_matched_as_the_build_writes_it(self):
+        rc, out, _ = copy(version="2026.111.1-abc1234-release-1-2", ref="refs/heads/release/1.2", env={"COPY_RESULT": DIGEST})
         self.assertEqual(rc, 0, out)
+
+    def test_main_and_master_write_production_tags(self):
+        for ref in ("refs/heads/main", "refs/heads/master"):
+            rc, out, _ = copy(ref=ref, env={"COPY_RESULT": DIGEST})
+            self.assertEqual(rc, 0, out)
+
+    def test_a_ref_that_is_not_a_branch_is_refused(self):
+        for ref in ("refs/pull/7/merge", "refs/tags/v1", "refs/heads/"):
+            rc, _, calls = copy(ref=ref)
+            self.assertEqual(rc, 1, ref)
+            self.assertEqual(calls, "")
 
     def test_bad_inputs_are_refused(self):
         for kwargs in ({"digest": "latest"}, {"version": "a b"}, {"image": "svc;id"}):
             rc, out, calls = copy(**kwargs)
             self.assertEqual(rc, 1, kwargs)
             self.assertEqual(calls, "")
-
-    def test_allowed_list_parses(self):
-        self.assertIsInstance(json.loads((ACTION / "allowed-images.json").read_text()), dict)
 
 
 if __name__ == "__main__":

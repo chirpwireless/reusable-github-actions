@@ -21,14 +21,15 @@ ecr-copy-build:
     digest: ${{ needs.build.outputs.image-digest }}
 ```
 
-- The build job never gets `id-token`: it runs the code of the service. The AWS role trusts this one workflow file, on
-  protected branches of the organization, so a job that runs service code cannot assume it.
+- The build job never gets `id-token`: it runs the code of the service. Each repository has its own AWS role, and it trusts
+  this one workflow file on the branches listed for that repository, so a job that runs service code cannot assume it.
 - The job runs on a GitHub-hosted runner and checks nothing out: the builder VMs are shared with service builds.
 - It runs on `main`, `master`, `develop` and `dev` and is skipped elsewhere, so pull request images stay on ghcr.
-  `dev` is trusted per repository in `hetzner-k8s/live/ecr-push-role`: another repository building on `dev` gets a red job
-  and no deploy until it has a line there.
-- A repository writes the image named after it. Any other image needs a line in
-  `.github/actions/ecr-copy/allowed-images.json`, because the role itself can write the whole namespace.
+- Repositories, their branches and their images are listed in `hetzner-k8s/live/ecr-push-role/ecr-push-repos.json`. A branch
+  or an image that is not there gets a red job and no deploy until it has a line. The role reads the variable
+  `AWS_ECR_PUSH_ROLE_PREFIX` plus the repository name.
+- Outside `main` and `master` a tag must end in `-<branch>`, the form `calendar-version` gives: only those two write tags that
+  production accepts, and tags in ECR are immutable.
 - A failed copy fails the build of that branch, and Auto Deploy does not start from it. A pull request build of the same
   commit still can: it skips the copy, succeeds, and `version-fetch` then picks the branch build, so the deploy fails on the
   missing image and helmfile rolls back.

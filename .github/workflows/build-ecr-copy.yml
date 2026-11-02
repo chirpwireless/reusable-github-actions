@@ -1,5 +1,6 @@
 name: Copy a built image from ghcr to AWS ECR
-# The push role trusts jobs of this file alone, on protected branches. Nothing here may run code of the calling service:
+# Each repository has its own push role, which trusts jobs of this file alone, on that repository's listed branches.
+# Nothing here may run code of the calling service:
 # no checkout, and the runner is GitHub-hosted because the builder VMs are shared with service builds.
 on:
   workflow_call:
@@ -34,7 +35,7 @@ jobs:
       - name: Log in to AWS ECR
         uses: chirpwireless/reusable-github-actions/.github/actions/ecr-login@main
         with:
-          role-arn: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
+          role-arn: ${{ vars.AWS_ECR_PUSH_ROLE_PREFIX }}${{ github.event.repository.name }}
       - name: Copy the image to AWS ECR
         uses: chirpwireless/reusable-github-actions/.github/actions/ecr-copy@main
         with:

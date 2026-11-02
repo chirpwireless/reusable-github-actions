@@ -1,11 +1,11 @@
 name: 'EcrLogin'
 description: >-
-  Logs in to AWS ECR through GitHub OIDC. Used only by the build-ecr-copy.yml workflow; the role trusts jobs of that
+  Logs in to AWS ECR through GitHub OIDC. Used only by the build-ecr-copy.yml workflow; each role trusts jobs of that
   workflow alone. Any failure fails the job.
 
 inputs:
   role-arn:
-    description: "IAM role to assume through OIDC (the AWS_ECR_PUSH_ROLE_ARN Actions variable)"
+    description: "IAM role to assume through OIDC (the AWS_ECR_PUSH_ROLE_PREFIX Actions variable and the repository name)"
     required: true
   region:
     description: "AWS region of the registry"

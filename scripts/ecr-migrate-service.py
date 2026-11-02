@@ -9,7 +9,7 @@ For every checkout path given:
      The build job itself never gets id-token: it runs the code of the service, and the copy job must not.
 
 It edits files in place and never commits, pushes or opens a PR. It exits non-zero, and says why, when:
-  - a service_name or a replaced image is not a repository in the ECR registry stack (--registry-stack)
+  - a service_name or a replaced image is not in the list of ECR images (--push-repos)
   - a replaced image is not built by a shared build job of this checkout (e.g. a sidecar built elsewhere) and is not
     named with --extra-image: its own workflow must copy it to ECR first
   - nothing changed and the checkout does not already point at ECR
@@ -21,6 +21,7 @@ A failed run may leave the checkout half edited: `git restore .` before retrying
 A repository with no deploy directory of its own takes --workflows-only and moves its image where it is deployed from.
 """
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -46,12 +47,9 @@ SERVICE_NAME = re.compile(r"^\s*service_name:\s*[\"']?([A-Za-z0-9._-]+)[\"']?\s*
 SKIP_DIRS = {".git", "node_modules"}
 
 
-def known_repositories(stack: Path) -> set[str]:
-    text = stack.read_text()
-    m = re.search(r"repository_names\s*=\s*\[(.*?)\]", text, re.S)
-    if not m:
-        sys.exit(f"{stack}: no repository_names list found")
-    return set(re.findall(r'"([^"]+)"', m.group(1)))
+def known_images(push_repos: Path) -> set[str]:
+    repos = json.loads(push_repos.read_text())["repos"]
+    return {image for entry in repos.values() for image in entry["images"]}
 
 
 def is_comment(line: str) -> bool:
@@ -80,7 +78,7 @@ def migrate_deploy(repo: Path, deploy_dir: str, registry: str, known: set[str], 
                 for image in GHCR_REF.findall(line):
                     images.add(image)
                     if image not in known:
-                        errors.append(f"{path.relative_to(repo)}:{i + 1}: image '{image}' is not a repository in the ECR registry stack")
+                        errors.append(f"{path.relative_to(repo)}:{i + 1}: image '{image}' is not in the list of ECR images")
                 lines[i] = line.replace(GHCR, f"{registry}/chirpwireless/")
                 touched = True
                 changed_lines += 1
@@ -133,7 +131,7 @@ def migrate_workflows(repo: Path, known: set[str], dry_run: bool) -> tuple[list[
             if service:
                 services.add(service)
             if service is None or service not in known:
-                errors.append(f"{path.name}:{i + 1}: service_name {service!r} is not a repository in the ECR registry stack")
+                errors.append(f"{path.name}:{i + 1}: service_name {service!r} is not in the list of ECR images")
             if any(re.match(r"^\s*id-token:\s*write", l) for l in block):
                 errors.append(f"{path.name}:{i + 1}: build job holds id-token: write; only the copy job may")
             i = end
@@ -157,7 +155,7 @@ def migrate_workflows(repo: Path, known: set[str], dry_run: bool) -> tuple[list[
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--registry", required=True, help="ECR registry host, e.g. <account>.dkr.ecr.eu-central-1.amazonaws.com")
-    ap.add_argument("--registry-stack", required=True, type=Path, help="hetzner-k8s live/ecr-registry/terragrunt.hcl (the repository list)")
+    ap.add_argument("--push-repos", required=True, type=Path, help="hetzner-k8s live/ecr-push-role/ecr-push-repos.json (repositories, their branches and images)")
     ap.add_argument("--deploy-dir", default="deploy", help="directory holding the charts and values, relative to the checkout (default: deploy)")
     only = ap.add_mutually_exclusive_group()
     only.add_argument("--deploy-only", action="store_true", help="edit deploy/ only")
@@ -167,7 +165,7 @@ def main() -> int:
     ap.add_argument("paths", nargs="+", type=Path, help="service checkouts")
     args = ap.parse_args()
 
-    known = known_repositories(args.registry_stack)
+    known = known_images(args.push_repos)
     rc = 0
     for repo in args.paths:
         print(repo)
