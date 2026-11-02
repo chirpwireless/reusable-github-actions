@@ -17,9 +17,9 @@ with ghcr only. The one exception: on an integration branch, when the service's 
 missing copy fails the build, because the deploy would otherwise fail later with an image that does not exist.
 The AWS side only trusts jobs that run these workflows from `reusable-github-actions@main`.
 
-`scripts/ecr-migrate-service.py` makes the per-service edits (every `ghcr.io/chirpwireless/` image under `deploy/`, and
+`scripts/ecr-migrate-service.py` (takes `--push-repos`, the `ecr-push-repos.yaml` above) makes the per-service edits (every `ghcr.io/chirpwireless/` image under `deploy/`, and
 `id-token: write` in every build job). Images built by a service's own job are copied with the reusable `build-ecr-copy.yml` workflow (inputs `service_name`, `version`). Run the script tests with `python3 -I scripts/tests/test_ecr_migrate_service.py` and `python3 -I scripts/tests/test_ecr_copy_action.py`.
 
 ## Installing Terraform in workflows
 
-`.github/actions/setup-terraform` installs the Terraform CLI from releases.hashicorp.com with retries and a checksum check; the validate and deploy workflows use it instead of `hashicorp/setup-terraform`, which failed with an `AggregateError` on runner network hiccups.
+`.github/actions/setup-terraform` installs the Terraform CLI from releases.hashicorp.com with retries, a signature check of `SHA256SUMS` against HashiCorp's release key (fingerprint pinned in the action, key bundled next to it; `gpg` must be on the runner) and a checksum check; the default version is pinned (`1.14.6`), callers pass `version` to change it; the validate and deploy workflows use it instead of `hashicorp/setup-terraform`, which failed with an `AggregateError` on runner network hiccups.

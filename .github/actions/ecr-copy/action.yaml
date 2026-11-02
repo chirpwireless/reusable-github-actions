@@ -36,11 +36,11 @@ runs:
             echo "::error::$TARGET already exists in ECR with digest $target_digest, but $SOURCE is $source_digest; tags are immutable, so the image in ECR is not the one just built"
             exit 1
           fi
-          if grep -qiE '403|denied|not authorized|unauthorized' <<<"$inspect_err"; then
+          if grep -qiE '403 Forbidden|denied:|not authorized to perform' <<<"$inspect_err"; then
             echo "::error::this repository's ECR role may not push $TARGET; the image name must be one of the images listed for this repository in hetzner-k8s live/ecr-push-role/ecr-push-repos.yaml"
             exit 1
           fi
-          if docker buildx imagetools create --tag "$TARGET" "$SOURCE"; then
+          if docker buildx imagetools create --prefer-index=false --tag "$TARGET" "$SOURCE"; then
             copied=true
           else
             echo "::warning::copy of $SOURCE to ECR failed; the image is in ghcr only"

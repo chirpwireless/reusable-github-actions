@@ -18,7 +18,9 @@ case "$3" in
       ecr/diff:*) echo '{"manifest":1}' ;;
       ghcr/diff:*) echo '{"manifest":2}' ;;
       ecr/denied:*) echo "unexpected status from HEAD request: 403 Forbidden" >&2; exit 1 ;;
-      ecr/new:*) echo "not found: 404" >&2; exit 1 ;;
+      ecr/new:*|ecr/new403:*) echo "not found: $4: 404" >&2; exit 1 ;;
+      ecr/unauth:*) echo "denied: requested access to the resource is denied" >&2; exit 1 ;;
+      ecr/noperm:*) echo "User is not authorized to perform: ecr:BatchGetImage" >&2; exit 1 ;;
       *) echo '{"manifest":3}' ;;
     esac ;;
   create) echo created ;;
@@ -35,7 +37,7 @@ class EcrCopyTest(unittest.TestCase):
             docker.chmod(0o755)
             env = dict(os.environ, PATH=f"{tmp}:{os.environ['PATH']}", SOURCE=source, TARGET=target,
                        REGISTRY="ecr", RUNNER_TEMP=tmp, GITHUB_REF="refs/heads/main")
-            return subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True, cwd=tmp)
+            return subprocess.run(["bash", "-eo", "pipefail", "-c", script], env=env, capture_output=True, text=True, cwd=tmp)
 
     def test_same_digest_passes(self):
         self.assertEqual(self.run_action("ghcr/same:1", "ecr/same:1").returncode, 0)
@@ -50,8 +52,19 @@ class EcrCopyTest(unittest.TestCase):
         self.assertEqual(r.returncode, 1)
         self.assertIn("may not push", r.stdout)
 
+    def test_denied_and_not_authorized_messages_fail(self):
+        for target in ("ecr/unauth:1", "ecr/noperm:1"):
+            r = self.run_action("ghcr/x:1", target)
+            self.assertEqual(r.returncode, 1, target)
+            self.assertIn("may not push", r.stdout)
+
     def test_new_tag_is_copied(self):
         self.assertEqual(self.run_action("ghcr/x:1", "ecr/new:1").returncode, 0)
+
+    def test_ref_containing_403_is_not_taken_for_a_denial(self):
+        r = self.run_action("ghcr/x:1", "ecr/new403:1")
+        self.assertEqual(r.returncode, 0)
+        self.assertNotIn("may not push", r.stdout)
 
 
 if __name__ == "__main__":

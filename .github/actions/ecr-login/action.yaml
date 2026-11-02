@@ -13,9 +13,6 @@ inputs:
   registry:
     description: "ECR registry host (the AWS_ECR_REGISTRY Actions variable)"
     default: ""
-  region:
-    description: "AWS region of the registry"
-    default: "eu-central-1"
 
 outputs:
   registry:
@@ -36,11 +33,16 @@ runs:
           *) on_branch=false ;;
         esac
         account="${REGISTRY%%.*}"
-        if [ "$on_branch" = true ] && [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] && [[ "$account" =~ ^[0-9]{12}$ ]]; then
+        region=""
+        if [[ "$REGISTRY" =~ ^[0-9]{12}\.dkr\.ecr\.([a-z0-9-]+)\.amazonaws\.com$ ]]; then
+          region="${BASH_REMATCH[1]}"
+        fi
+        if [ "$on_branch" = true ] && [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] && [ -n "$region" ]; then
           echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "region=$region" >> "$GITHUB_OUTPUT"
           echo "role-arn=arn:aws:iam::${account}:role/${ROLE_PREFIX}${GITHUB_REPOSITORY#*/}" >> "$GITHUB_OUTPUT"
         else
-          echo "ECR copy skipped: not an integration branch push, or id-token permission or registry is not set"
+          echo "ECR copy skipped: not an integration branch push, or id-token permission or a valid ECR registry host is not set"
           echo "enabled=false" >> "$GITHUB_OUTPUT"
         fi
     - id: aws
@@ -49,7 +51,7 @@ runs:
       uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
       with:
         role-to-assume: ${{ steps.gate.outputs.role-arn }}
-        aws-region: ${{ inputs.region }}
+        aws-region: ${{ steps.gate.outputs.region }}
     - id: login
       if: steps.aws.outcome == 'success'
       continue-on-error: true

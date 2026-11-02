@@ -7,7 +7,7 @@ from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parent.parent / "ecr-migrate-service.py"
 REGISTRY = "123456789012.dkr.ecr.eu-central-1.amazonaws.com"
-STACK = 'inputs = {\n  repository_names = [\n    "svc",\n    "authz-proxy",\n    "other",\n  ]\n}\n'
+STACK = "repos:\n  repo-a:\n    refs: [refs/heads/main]\n    images: [svc, authz-proxy]\n  repo-b:\n    refs: [refs/heads/main]\n    images: [other]\n"
 
 BUILD = """\
 name: Build
@@ -26,14 +26,14 @@ jobs:
 def run(files, extra=()):
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
-        (root / "stack.hcl").write_text(STACK)
+        (root / "push-repos.yaml").write_text(STACK)
         repo = root / "repo"
         for name, body in files.items():
             p = repo / name
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(textwrap.dedent(body) if not body.startswith("name:") else body)
         proc = subprocess.run(
-            [sys.executable, "-I", str(SCRIPT), "--registry", REGISTRY, "--registry-stack", str(root / "stack.hcl"), *extra, str(repo)],
+            [sys.executable, "-I", str(SCRIPT), "--registry", REGISTRY, "--push-repos", str(root / "push-repos.yaml"), *extra, str(repo)],
             capture_output=True, text=True,
         )
         out = {n: (repo / n).read_text() for n in files}
@@ -139,12 +139,12 @@ class MigrateTest(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / "stack.hcl").write_text(STACK)
+            (root / "push-repos.yaml").write_text(STACK)
             repo = root / "repo"
             for n, b in files.items():
                 (repo / n).parent.mkdir(parents=True, exist_ok=True)
                 (repo / n).write_text(b)
-            cmd = [sys.executable, "-I", str(SCRIPT), "--registry", REGISTRY, "--registry-stack", str(root / "stack.hcl"), str(repo)]
+            cmd = [sys.executable, "-I", str(SCRIPT), "--registry", REGISTRY, "--push-repos", str(root / "push-repos.yaml"), str(repo)]
             self.assertEqual(subprocess.run(cmd, capture_output=True, text=True).returncode, 0)
             second = subprocess.run(cmd, capture_output=True, text=True)
             self.assertEqual(second.returncode, 0, second.stdout)
