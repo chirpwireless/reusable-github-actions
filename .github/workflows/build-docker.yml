@@ -20,6 +20,11 @@ on:
         type: string
         required: false
         default: "."
+      private_go_modules:
+        description: "Pass a GitHub App token to the Docker build as the BuildKit secret gh_token so the Dockerfile can fetch private Go modules (mount it with RUN --mount=type=secret,id=gh_token)"
+        type: boolean
+        required: false
+        default: false
     outputs:
       new-version:
         description: "The new service version"
@@ -57,6 +62,14 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create GitHub App token for private Go modules
+        if: ${{ inputs.private_go_modules }}
+        uses: actions/create-github-app-token@v1
+        id: app-token-chirp-wireless
+        with:
+          app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
+          private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
+          owner: "chirpwireless"
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
@@ -65,6 +78,7 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
           build-args: ${{ inputs.build_args }}
+          secrets: ${{ inputs.private_go_modules && format('gh_token={0}', steps.app-token-chirp-wireless.outputs.token) || '' }}
 
   publish-version:
     runs-on:
