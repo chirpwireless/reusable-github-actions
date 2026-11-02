@@ -1,0 +1,38 @@
+name: 'SetupTerraform'
+description: >-
+  Installs the Terraform CLI from releases.hashicorp.com with retries and a checksum check.
+  Replaces hashicorp/setup-terraform, which fails with an AggregateError on runner network hiccups and cannot retry.
+
+inputs:
+  version:
+    description: "Terraform version; the latest release when empty"
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        curl_retry=(curl -fsSL --retry 6 --retry-all-errors --retry-delay 5 --connect-timeout 20 --max-time 180)
+        if [ -z "$VERSION" ]; then
+          VERSION=$("${curl_retry[@]}" https://checkpoint-api.hashicorp.com/v1/check/terraform | sed -n 's/.*"current_version":"\([^"]*\)".*/\1/p')
+        fi
+        [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::cannot resolve a Terraform version (got '$VERSION')"; exit 1; }
+        case "$(uname -m)" in
+          x86_64) arch=amd64 ;;
+          aarch64|arm64) arch=arm64 ;;
+          *) echo "::error::unsupported architecture $(uname -m)"; exit 1 ;;
+        esac
+        base="https://releases.hashicorp.com/terraform/${VERSION}"
+        zip="terraform_${VERSION}_linux_${arch}.zip"
+        dir="$RUNNER_TEMP/terraform-${VERSION}"
+        mkdir -p "$dir"
+        "${curl_retry[@]}" -o "$dir/$zip" "$base/$zip"
+        "${curl_retry[@]}" -o "$dir/SHA256SUMS" "$base/terraform_${VERSION}_SHA256SUMS"
+        (cd "$dir" && grep " $zip\$" SHA256SUMS | sha256sum -c -)
+        unzip -o -q "$dir/$zip" -d "$dir"
+        echo "$dir" >> "$GITHUB_PATH"
+        "$dir/terraform" version

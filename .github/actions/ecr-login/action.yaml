@@ -2,13 +2,14 @@ name: 'EcrLogin'
 description: >-
   Logs in to AWS ECR through GitHub OIDC so a build can push an image there next to ghcr.
   Only on pushes to integration branches (main, master, develop, dev, test); pull-request images stay on ghcr.
-  A no-op, and never a failure, when the calling workflow has no id-token: write permission,
-  the role or registry is not configured, or AWS rejects the login.
+  The role is the calling repository's own: ecr-push-<repository name> in the registry's AWS account, which only trusts that
+  repository's exact branches and lets it push only its own images. A no-op, and never a failure, when the calling workflow has
+  no id-token: write permission, the registry is not configured, or AWS rejects the login (a repository without a role).
 
 inputs:
-  role-arn:
-    description: "IAM role to assume through OIDC (the AWS_ECR_PUSH_ROLE_ARN Actions variable)"
-    default: ""
+  role-name-prefix:
+    description: "Prefix of the per-repository role name, as in the github-oidc-ecr-push module"
+    default: "ecr-push-"
   registry:
     description: "ECR registry host (the AWS_ECR_REGISTRY Actions variable)"
     default: ""
@@ -27,17 +28,19 @@ runs:
     - id: gate
       shell: bash
       env:
-        ROLE_ARN: ${{ inputs.role-arn }}
         REGISTRY: ${{ inputs.registry }}
+        ROLE_PREFIX: ${{ inputs.role-name-prefix }}
       run: |
         case "$GITHUB_EVENT_NAME:$GITHUB_REF" in
           push:refs/heads/main|push:refs/heads/master|push:refs/heads/develop|push:refs/heads/dev|push:refs/heads/test|workflow_dispatch:refs/heads/main|workflow_dispatch:refs/heads/master|workflow_dispatch:refs/heads/develop|workflow_dispatch:refs/heads/dev|workflow_dispatch:refs/heads/test) on_branch=true ;;
           *) on_branch=false ;;
         esac
-        if [ "$on_branch" = true ] && [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] && [ -n "$ROLE_ARN" ] && [ -n "$REGISTRY" ]; then
+        account="${REGISTRY%%.*}"
+        if [ "$on_branch" = true ] && [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] && [[ "$account" =~ ^[0-9]{12}$ ]]; then
           echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "role-arn=arn:aws:iam::${account}:role/${ROLE_PREFIX}${GITHUB_REPOSITORY#*/}" >> "$GITHUB_OUTPUT"
         else
-          echo "ECR copy skipped: not an integration branch push, or id-token permission, role or registry is not set"
+          echo "ECR copy skipped: not an integration branch push, or id-token permission or registry is not set"
           echo "enabled=false" >> "$GITHUB_OUTPUT"
         fi
     - id: aws
@@ -45,7 +48,7 @@ runs:
       continue-on-error: true
       uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
       with:
-        role-to-assume: ${{ inputs.role-arn }}
+        role-to-assume: ${{ steps.gate.outputs.role-arn }}
         aws-region: ${{ inputs.region }}
     - id: login
       if: steps.aws.outcome == 'success'

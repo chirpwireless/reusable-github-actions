@@ -41,9 +41,9 @@ runs:
         node-version: "24"
 
     - name: Set up Terraform
-      uses: hashicorp/setup-terraform@v4
+      uses: chirpwireless/reusable-github-actions/.github/actions/setup-terraform@main
       with:
-        terraform_version: ${{ inputs.tf_version }}
+        version: ${{ inputs.tf_version }}
 
     - uses: gruntwork-io/terragrunt-action@v3
       env:

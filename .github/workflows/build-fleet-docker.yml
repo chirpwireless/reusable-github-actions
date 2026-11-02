@@ -54,7 +54,6 @@ jobs:
         id: ecr
         uses: chirpwireless/reusable-github-actions/.github/actions/ecr-login@main
         with:
-          role-arn: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
           registry: ${{ vars.AWS_ECR_REGISTRY }}
       - name: Build and push Docker image
         uses: docker/build-push-action@v6

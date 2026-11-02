@@ -32,7 +32,7 @@ jobs:
           node-version: "24"
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: chirpwireless/reusable-github-actions/.github/actions/setup-terraform@main
 
       - name: Find and Validate Modules
         run: |
@@ -42,6 +42,14 @@ jobs:
             terraform init -backend=false
             terraform validate
             cd -
+          done
+
+      - name: Run Terraform tests
+        run: |
+          find modules -type f -name "*.tftest.hcl" -path "*/tests/*" -exec dirname {} \; | sed 's|/tests$||' | sort -u | while read -r dir; do
+            echo "Testing Terraform module in $dir"
+            terraform -chdir="$dir" init -backend=false
+            terraform -chdir="$dir" test
           done
 
       - name: Check Formatting

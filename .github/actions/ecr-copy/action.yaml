@@ -1,6 +1,6 @@
 name: 'EcrCopy'
 description: >-
-  Copies the image just pushed to ghcr into ECR (registry to registry, no rebuild). A failed or skipped copy never fails the build,
+  Copies the image just pushed to ghcr into ECR (registry to registry, no rebuild). A tag already in ECR must have the digest of the source image, otherwise the step fails; a target this repository's role may not push fails too. A failed or skipped copy never fails the build,
   except on an integration branch of a service whose deploy/ values already name an ECR registry: there a missing ECR image
   would only surface at deploy time, so the build fails instead.
 
@@ -26,9 +26,19 @@ runs:
       run: |
         copied=false
         if [ -n "$REGISTRY" ]; then
-          if docker buildx imagetools inspect "$TARGET" >/dev/null 2>&1; then
-            echo "$TARGET already exists in ECR (tags are immutable): nothing to copy"
-            exit 0
+          if inspect_err=$(docker buildx imagetools inspect "$TARGET" --raw 2>&1 >"$RUNNER_TEMP/target-manifest"); then
+            target_digest="sha256:$(sha256sum <"$RUNNER_TEMP/target-manifest" | cut -d' ' -f1)"
+            source_digest="sha256:$(docker buildx imagetools inspect "$SOURCE" --raw | sha256sum | cut -d' ' -f1)"
+            if [ "$source_digest" = "$target_digest" ]; then
+              echo "$TARGET already exists in ECR with the same digest ($target_digest): nothing to copy"
+              exit 0
+            fi
+            echo "::error::$TARGET already exists in ECR with digest $target_digest, but $SOURCE is $source_digest; tags are immutable, so the image in ECR is not the one just built"
+            exit 1
+          fi
+          if grep -qiE '403|denied|not authorized|unauthorized' <<<"$inspect_err"; then
+            echo "::error::this repository's ECR role may not push $TARGET; the image name must be one of the images listed for this repository in hetzner-k8s live/ecr-push-role/ecr-push-repos.yaml"
+            exit 1
           fi
           if docker buildx imagetools create --tag "$TARGET" "$SOURCE"; then
             copied=true
