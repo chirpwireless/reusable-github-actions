@@ -6,7 +6,7 @@ This repository contains a set of GitHub actions and workflows which can be used
 
 `build-ecr-copy.yml` copies one image from ghcr to `<registry>/<owner>/<image>:<version>` by digest and proves the tag in
 ECR holds that digest. A service opts in with one job next to its build job; `scripts/ecr-migrate-service.py` adds it and
-moves the addresses under `deploy/`:
+moves the addresses under `deploy/`, or `--deploy-dir charts` where the chart lives there:
 
 ```yaml
 ecr-copy-build:

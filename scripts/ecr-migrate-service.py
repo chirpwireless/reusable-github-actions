@@ -2,8 +2,9 @@
 """Make the two-part ECR change in service checkouts.
 
 For every checkout path given:
-  1. everything under deploy/: ghcr.io/chirpwireless/<image> -> <registry>/chirpwireless/<image> on every
-     non-comment line (values, templates, per-environment values, quoted or `image:` forms)
+  1. everything under deploy/, or the directory named with --deploy-dir: ghcr.io/chirpwireless/<image> ->
+     <registry>/chirpwireless/<image> on every non-comment line (values, templates, per-environment values, quoted or
+     `image:` forms)
   2. .github/workflows: after every job that calls a reusable build-*.yml, a job that calls build-ecr-copy.yml.
      The build job itself never gets id-token: it runs the code of the service, and the copy job must not.
 
@@ -12,11 +13,12 @@ It edits files in place and never commits, pushes or opens a PR. It exits non-ze
   - a replaced image is not built by a shared build job of this checkout (e.g. a sidecar built elsewhere) and is not
     named with --extra-image: its own workflow must copy it to ECR first
   - nothing changed and the checkout does not already point at ECR
-  - a non-comment ghcr.io/chirpwireless reference is left under deploy/
+  - a non-comment ghcr.io/chirpwireless reference is left in that directory
   - a build job holds id-token: write
 
 A failed run may leave the checkout half edited: `git restore .` before retrying.
 --deploy-only / --workflows-only do just one of the two parts (the other is read for its checks, not written).
+A repository with no deploy directory of its own takes --workflows-only and moves its image where it is deployed from.
 """
 import argparse
 import re
@@ -56,12 +58,12 @@ def is_comment(line: str) -> bool:
     return line.lstrip().startswith("#")
 
 
-def migrate_deploy(repo: Path, registry: str, known: set[str], dry_run: bool) -> tuple[list[str], list[str], set[str]]:
+def migrate_deploy(repo: Path, deploy_dir: str, registry: str, known: set[str], dry_run: bool) -> tuple[list[str], list[str], set[str]]:
     report, errors = [], []
     images: set[str] = set()
-    deploy = repo / "deploy"
+    deploy = repo / deploy_dir
     if not deploy.is_dir():
-        return report, [f"{repo}: no deploy/ directory"], images
+        return report, [f"{repo}: no {deploy_dir}/ directory"], images
     changed_lines = already = 0
     for path in sorted(p for p in deploy.rglob("*") if p.is_file() and not (SKIP_DIRS & set(p.parts))):
         try:
@@ -92,11 +94,11 @@ def migrate_deploy(repo: Path, registry: str, known: set[str], dry_run: bool) ->
         except UnicodeDecodeError:
             continue
     if changed_lines:
-        report.append(f"deploy/: {changed_lines} line(s) changed")
+        report.append(f"{deploy_dir}/: {changed_lines} line(s) changed")
     elif already:
-        report.append("deploy/: already points at ECR")
+        report.append(f"{deploy_dir}/: already points at ECR")
     else:
-        errors.append("deploy/: nothing changed and no ECR reference present")
+        errors.append(f"{deploy_dir}/: nothing changed and no ECR reference present")
     return report, errors, images
 
 
@@ -156,6 +158,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--registry", required=True, help="ECR registry host, e.g. <account>.dkr.ecr.eu-central-1.amazonaws.com")
     ap.add_argument("--registry-stack", required=True, type=Path, help="hetzner-k8s live/ecr-registry/terragrunt.hcl (the repository list)")
+    ap.add_argument("--deploy-dir", default="deploy", help="directory holding the charts and values, relative to the checkout (default: deploy)")
     only = ap.add_mutually_exclusive_group()
     only.add_argument("--deploy-only", action="store_true", help="edit deploy/ only")
     only.add_argument("--workflows-only", action="store_true", help="edit .github/workflows only")
@@ -168,7 +171,7 @@ def main() -> int:
     rc = 0
     for repo in args.paths:
         print(repo)
-        r1, e1, images = migrate_deploy(repo, args.registry, known, args.dry_run or args.workflows_only)
+        r1, e1, images = migrate_deploy(repo, args.deploy_dir, args.registry, known, args.dry_run or args.workflows_only)
         r2, e2, services = migrate_workflows(repo, known, args.dry_run or args.deploy_only)
         if args.workflows_only:
             r1, e1, images = [], [], set()

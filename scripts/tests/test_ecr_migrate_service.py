@@ -132,6 +132,37 @@ class MigrateTest(unittest.TestCase):
         text = files[".github/workflows/pipeline-build.yml"]
         self.assertLess(text.index("ecr-copy-build:"), text.index("  other:"))
 
+    def test_chart_outside_deploy_needs_the_flag(self):
+        files = {
+            ".github/workflows/pipeline-build.yml": BUILD,
+            "charts/svc/values.yaml": "image:\n  repository: ghcr.io/chirpwireless/svc\n",
+        }
+        rc, out, unchanged = run(files)
+        self.assertEqual(rc, 1)
+        self.assertIn("no deploy/ directory", out)
+        self.assertIn("ghcr.io/chirpwireless/svc", unchanged["charts/svc/values.yaml"])
+        rc, out, moved = run(files, extra=("--deploy-dir", "charts"))
+        self.assertEqual(rc, 0, out)
+        self.assertIn("charts/: 1 line(s) changed", out)
+        self.assertIn(REGISTRY + "/chirpwireless/svc", moved["charts/svc/values.yaml"])
+        self.assertIn("  ecr-copy-build:\n", moved[".github/workflows/pipeline-build.yml"])
+
+    def test_chart_outside_deploy_keeps_the_leftover_check(self):
+        rc, out, _ = run({
+            ".github/workflows/pipeline-build.yml": BUILD,
+            "charts/svc/values.yaml": "image:\n  repository: ghcr.io/chirpwireless/unknown\n",
+        }, extra=("--deploy-dir", "charts"))
+        self.assertEqual(rc, 1)
+        self.assertIn("image 'unknown' is not a repository", out)
+
+    def test_workflow_without_final_newline(self):
+        rc, out, files = run({
+            ".github/workflows/pipeline-build.yml": BUILD.rstrip("\n"),
+            "deploy/values/common.yaml": "image:\n  repository: ghcr.io/chirpwireless/svc\n",
+        })
+        self.assertEqual(rc, 0, out)
+        self.assertIn('service_name: "svc"\n  ecr-copy-build:\n', files[".github/workflows/pipeline-build.yml"])
+
     def test_workflows_only_leaves_deploy_untouched(self):
         rc, out, files = run({
             ".github/workflows/pipeline-build.yml": BUILD,
