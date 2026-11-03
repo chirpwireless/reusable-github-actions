@@ -25,6 +25,11 @@ on:
         type: boolean
         required: false
         default: false
+      private_go_module_repositories:
+        description: "Comma-separated repositories of the chirpwireless org the private-module token may read (the modules the build fetches); every other repository stays out of the build's reach"
+        type: string
+        required: false
+        default: "go-kit"
       gitlab_token_secret:
         description: "Name of an Actions secret holding a GitLab token; passed to the Docker build as the BuildKit secret gitlab_token (mount it with RUN --mount=type=secret,id=gitlab_token). Empty disables it"
         type: string
@@ -75,6 +80,7 @@ jobs:
           app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
           private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
           owner: "chirpwireless"
+          repositories: ${{ inputs.private_go_module_repositories }}
           # The build only reads module sources; without this the token carries every permission of the App.
           permission-contents: read
       - name: Build and push Docker image
