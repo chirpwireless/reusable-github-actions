@@ -13,6 +13,9 @@ jobs:
   terraform-validate:
     # Terraform needs its release and provider sites, which the self-hosted runners do not reach.
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      checks: write
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
     steps:
@@ -46,7 +49,7 @@ jobs:
 
       - name: Run Terraform tests
         run: |
-          find modules -type f -name "*.tftest.hcl" -path "*/tests/*" -exec dirname {} \; | sed 's|/tests$||' | sort -u | while read -r dir; do
+          find modules -type f -name "*.tftest.hcl" -path "*/tests/*" -not -path "*/.terraform/*" -exec dirname {} \; | sed 's|/tests$||' | sort -u | while read -r dir; do
             echo "Testing Terraform module in $dir"
             terraform -chdir="$dir" init -backend=false
             terraform -chdir="$dir" test
