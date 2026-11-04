@@ -25,8 +25,8 @@ on:
 
 jobs:
   fetch_version:
-    runs-on:
-      group: hetzner-k3s-dev
+    # Reads the GitHub API only: a dev runner must not choose what prod deploys.
+    runs-on: ubuntu-latest
     outputs:
       version: ${{steps.fetch-version.outputs.version}}
     steps:
