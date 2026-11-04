@@ -138,6 +138,24 @@ class MigrateTest(unittest.TestCase):
         self.assertEqual(rc, 1, out)
         self.assertIn("the workflow gives id-token: write", out)
 
+    def test_workflow_level_write_all_fails(self):
+        wf = BUILD.replace("jobs:\n", "permissions: write-all\njobs:\n")
+        rc, out, _ = run({".github/workflows/pipeline-build.yml": wf, **DEPLOY_VALUES})
+        self.assertEqual(rc, 1, out)
+        self.assertIn("the workflow gives id-token: write", out)
+
+    def test_auto_deploy_with_another_condition_in_the_guard_fails(self):
+        other = AUTO_DEPLOY.replace("conclusion == 'success' }}", "conclusion == 'success' || inputs.force }}")
+        rc, out, files = run({".github/workflows/pipeline-build.yml": BUILD, ".github/workflows/auto-deploy.yml": other, **DEPLOY_VALUES})
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(files[".github/workflows/auto-deploy.yml"], other)
+
+    def test_comment_after_workflow_run_does_not_hide_it(self):
+        commented = AUTO_DEPLOY.replace("  workflow_run:\n", "  workflow_run: # after Build\n")
+        rc, out, files = run({".github/workflows/pipeline-build.yml": BUILD, ".github/workflows/auto-deploy.yml": commented, **DEPLOY_VALUES})
+        self.assertEqual(rc, 0, out)
+        self.assertIn(BRANCH_ONLY, files[".github/workflows/auto-deploy.yml"])
+
     def test_auto_deploy_starts_only_from_a_branch_build(self):
         rc, out, files = run({".github/workflows/pipeline-build.yml": BUILD, ".github/workflows/auto-deploy.yml": AUTO_DEPLOY, **DEPLOY_VALUES})
         self.assertEqual(rc, 0, out)

@@ -9,6 +9,7 @@ For every checkout path given:
      The build job itself never gets id-token: it runs the code of the service, and the copy job must not.
   3. .github/workflows: a workflow started by workflow_run starts only from a branch build. A pull request build is never
      copied to ECR and ends before the copy of the branch build of the same commit, so a deploy from it finds no image.
+     GitHub runs such a workflow from the default branch, so this holds only once the edit is there.
 
 It edits files in place and never commits, pushes or opens a PR. It exits non-zero, and says why, when:
   - a service_name or a replaced image is not in the list of ECR images (--push-repos)
@@ -17,10 +18,11 @@ It edits files in place and never commits, pushes or opens a PR. It exits non-ze
   - nothing changed and the checkout does not already point at ECR
   - a non-comment ghcr.io/chirpwireless reference is left in that directory
   - a build job holds id-token: write, in its own permissions or from the workflow's
-  - a workflow_run workflow has no guard of the known form to extend
+  - a workflow_run workflow does not hold exactly one guard of the known form to extend
 
 A failed run may leave the checkout half edited: `git restore .` before retrying.
---deploy-only / --workflows-only do just one of the two parts (the other is read for its checks, not written).
+--workflows-only edits only .github/workflows. --deploy-only edits only the deploy directory and skips every check of the
+workflows, so Auto Deploy stays as it is.
 A repository with no deploy directory of its own takes --workflows-only and moves its image where it is deployed from.
 """
 import argparse
@@ -48,9 +50,11 @@ COPY_JOB = """
 """
 SERVICE_NAME = re.compile(r"^\s*service_name:\s*[\"']?([A-Za-z0-9._-]+)[\"']?\s*(#.*)?$")
 SKIP_DIRS = {".git", "node_modules"}
-WORKFLOW_RUN = re.compile(r"^\s*workflow_run:\s*$", re.M)
+WORKFLOW_RUN = re.compile(r"^\s*workflow_run:\s*(#.*)?$", re.M)
 SUCCESS_GUARD = "github.event.workflow_run.conclusion == 'success'"
 BRANCH_BUILD_GUARD = f"{SUCCESS_GUARD} && github.event.workflow_run.event != 'pull_request'"
+SUCCESS_GUARD_LINE = re.compile(r"^(\s*if:\s*\$\{\{\s*)" + re.escape(SUCCESS_GUARD) + r"(\s*\}\}\s*)$", re.M)
+WORKFLOW_ID_TOKEN = re.compile(r"id-token:\s*write|^permissions:\s*write-all", re.M)
 
 
 def known_images(push_repos: Path) -> set[str]:
@@ -109,11 +113,12 @@ def migrate_deploy(repo: Path, deploy_dir: str, registry: str, known: set[str], 
 def guard_workflow_run(path: Path, text: str, dry_run: bool) -> tuple[list[str], list[str]]:
     if not WORKFLOW_RUN.search(text) or BRANCH_BUILD_GUARD in text:
         return [], []
-    if text.count(SUCCESS_GUARD) != 1:
-        return [], [f"{path.name}: expected one `{SUCCESS_GUARD}` to extend; add the pull request guard by hand"]
+    guarded, count = SUCCESS_GUARD_LINE.subn(rf"\g<1>{BRANCH_BUILD_GUARD}\g<2>", text)
+    if count != 1:
+        return [], [f"{path.name}: expected one `if: ${{{{ {SUCCESS_GUARD} }}}}` line to extend; add the pull request guard by hand"]
     if not dry_run:
-        path.write_text(text.replace(SUCCESS_GUARD, BRANCH_BUILD_GUARD))
-    return [f"{path.name}: starts only from a branch build"], []
+        path.write_text(guarded)
+    return [f"{path.name}: starts only from a branch build, once this file is on the default branch"], []
 
 
 def migrate_workflows(repo: Path, known: set[str], dry_run: bool) -> tuple[list[str], list[str], set[str]]:
@@ -161,7 +166,8 @@ def migrate_workflows(repo: Path, known: set[str], dry_run: bool) -> tuple[list[
             path.write_text("".join(lines))
         if edits:
             report.append(f"{path.name}: copy job added after {len(edits)} build job(s)")
-        if any(BUILD_USES.match(l) for l in lines) and re.search(r"^\s*id-token:\s*write", text.split("\njobs:", 1)[0], re.M):
+        builds = [m for m in map(BUILD_USES.match, lines) if m and m.group(2) != COPY_WORKFLOW]
+        if builds and WORKFLOW_ID_TOKEN.search(text.split("\njobs:", 1)[0]):
             errors.append(f"{path.name}: the workflow gives id-token: write to its build jobs; only the copy job may")
         guarded, guard_errors = guard_workflow_run(path, "".join(lines), dry_run)
         report += guarded
