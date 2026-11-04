@@ -24,8 +24,11 @@ env:
 
 jobs:
   terragrunt-validate:
-    runs-on:
-      group: hetzner-k3s-dev
+    # Terraform needs its release and provider sites, which the self-hosted runners do not reach.
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      checks: write
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
     steps:
@@ -45,6 +48,8 @@ jobs:
           app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
           private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
+          repositories: hetzner-modules,aws-modules
+          permission-contents: read
 
       - name: Install Node.js
         uses: actions/setup-node@v6
