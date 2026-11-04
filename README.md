@@ -30,9 +30,10 @@ ecr-copy-build:
   `AWS_ECR_PUSH_ROLE_PREFIX` plus the repository name.
 - Outside `main` and `master` a tag must end in `-<branch>`, the form `calendar-version` gives: only those two write tags that
   production accepts, and tags in ECR are immutable.
-- A failed copy fails the build of that branch, and Auto Deploy does not start from it. A pull request build of the same
-  commit still can: it skips the copy, succeeds, and `version-fetch` then picks the branch build, so the deploy fails on the
-  missing image and helmfile rolls back.
+- A failed copy fails the build of that branch, and Auto Deploy does not start from it. A pull request build skips the copy,
+  so `scripts/ecr-migrate-service.py` also makes the Auto Deploy of a migrated service start only from a branch build, when
+  its copy is done. `version-fetch` alone cannot do this: a pull request build can end before the branch build has published
+  its version. Auto Deploy runs from the default branch, so this takes effect once the change is there.
 - A service that does not call this workflow gets no copy job, but every build and deploy uses `version-publish` and
   `version-fetch` at `@main`, so a merge here changes those two for all services at once.
 

@@ -22,6 +22,25 @@ jobs:
       service_name: "svc"
 """
 
+AUTO_DEPLOY = """\
+name: Auto Deploy
+on:
+  workflow_run:
+    workflows: ["Build"]
+    types:
+      - completed
+    branches:
+      - develop
+jobs:
+  check-build-status:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ok
+"""
+BRANCH_ONLY = "github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'pull_request'"
+DEPLOY_VALUES = {"deploy/values/common.yaml": "image:\n  repository: ghcr.io/chirpwireless/svc\n"}
+
 
 def run(files, extra=()):
     with tempfile.TemporaryDirectory() as tmp:
@@ -112,6 +131,45 @@ class MigrateTest(unittest.TestCase):
         self.assertEqual(wf.count("build-ecr-copy.yml@main"), 2)
         self.assertIn("needs: [build-worker]", wf)
         self.assertIn('image: "other"', wf)
+
+    def test_workflow_level_id_token_fails(self):
+        wf = BUILD.replace("jobs:\n", "permissions:\n  id-token: write\njobs:\n")
+        rc, out, _ = run({".github/workflows/pipeline-build.yml": wf, **DEPLOY_VALUES})
+        self.assertEqual(rc, 1, out)
+        self.assertIn("the workflow gives id-token: write", out)
+
+    def test_auto_deploy_starts_only_from_a_branch_build(self):
+        rc, out, files = run({".github/workflows/pipeline-build.yml": BUILD, ".github/workflows/auto-deploy.yml": AUTO_DEPLOY, **DEPLOY_VALUES})
+        self.assertEqual(rc, 0, out)
+        self.assertIn(f"if: ${{{{ {BRANCH_ONLY} }}}}", files[".github/workflows/auto-deploy.yml"])
+        self.assertIn("auto-deploy.yml: starts only from a branch build", out)
+
+    def test_auto_deploy_already_guarded_stays_as_it_is(self):
+        guarded = AUTO_DEPLOY.replace("github.event.workflow_run.conclusion == 'success'", BRANCH_ONLY)
+        rc, out, files = run({".github/workflows/pipeline-build.yml": BUILD, ".github/workflows/auto-deploy.yml": guarded, **DEPLOY_VALUES})
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(files[".github/workflows/auto-deploy.yml"], guarded)
+        self.assertNotIn("starts only from a branch build", out)
+
+    def test_auto_deploy_of_an_unknown_form_fails(self):
+        other = AUTO_DEPLOY.replace("    if: ${{ github.event.workflow_run.conclusion == 'success' }}\n", "")
+        rc, out, files = run({".github/workflows/pipeline-build.yml": BUILD, ".github/workflows/auto-deploy.yml": other, **DEPLOY_VALUES})
+        self.assertEqual(rc, 1, out)
+        self.assertIn("add the pull request guard by hand", out)
+
+    def test_dry_run_leaves_auto_deploy_as_it_is(self):
+        rc, out, files = run({".github/workflows/pipeline-build.yml": BUILD, ".github/workflows/auto-deploy.yml": AUTO_DEPLOY, **DEPLOY_VALUES}, extra=("--dry-run",))
+        self.assertEqual(files[".github/workflows/auto-deploy.yml"], AUTO_DEPLOY)
+        self.assertIn("auto-deploy.yml: starts only from a branch build", out)
+
+    def test_workflow_with_a_build_job_and_workflow_run_keeps_both_edits(self):
+        both = BUILD.replace("on: [push]\n", "on:\n  workflow_run:\n    workflows: [\"Tests\"]\n").replace(
+            "  build:\n", "  build:\n    if: ${{ github.event.workflow_run.conclusion == 'success' }}\n")
+        rc, out, files = run({".github/workflows/pipeline-build.yml": both, **DEPLOY_VALUES})
+        self.assertEqual(rc, 0, out)
+        wf = files[".github/workflows/pipeline-build.yml"]
+        self.assertIn("ecr-copy-build:", wf)
+        self.assertIn(BRANCH_ONLY, wf)
 
     def test_build_job_with_id_token_fails(self):
         wf = BUILD.replace("      packages: write\n", "      packages: write\n      id-token: write\n")
