@@ -97,7 +97,7 @@ def migrate_deploy(repo: Path, deploy_dir: str, registry: str, known: set[str], 
     for path in sorted(p for p in deploy.rglob("*") if p.is_file()):
         try:
             for n, line in enumerate((path.read_text() if not dry_run else "").splitlines(), 1):
-                if not is_comment(line) and "ghcr.io/chirpwireless" in line:
+                if not is_comment(line) and "ghcr.io/chirpwireless" in line.split(" #", 1)[0]:
                     errors.append(f"{path.relative_to(repo)}:{n}: leftover ghcr.io/chirpwireless reference")
         except UnicodeDecodeError:
             continue

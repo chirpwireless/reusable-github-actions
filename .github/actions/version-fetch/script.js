@@ -1,5 +1,8 @@
 const MAIN_BUILD_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7}$/;
 const BRANCH_BUILD_SUMMARY = /^event = (?!pull_request$)/m;
+const REF_LINE = /^ref = /m;
+const MAIN_REF = /^ref = refs\/heads\/(main|master)$/m;
+const COPIED_REF = /^ref = refs\/heads\/(main|master|develop|dev)$/m;
 
 async function fetchRelease({github, context, core}) {
     const repo = context.repo.repo;
@@ -33,10 +36,12 @@ async function fetchVersionFromCheck({github, context, core}) {
         return undefined;
     }
 
+    const summaryOf = (run) => run.output?.summary || '';
     // A pull request build publishes its merge-ref image on the PR head commit, so a main commit can carry both.
-    const mainBuild = res.data.check_runs.find((run) => MAIN_BUILD_VERSION.test(run.output?.title || ''));
-    // Images of pull request builds are never copied to ECR, so a branch build wins on any branch.
-    const branchBuild = res.data.check_runs.find((run) => BRANCH_BUILD_SUMMARY.test(run.output?.summary || ''));
+    // calendar-version gives the main form to any branch with main or master in its name, and only the copy's refs reach ECR.
+    const mainBuild = res.data.check_runs.find((run) => MAIN_BUILD_VERSION.test(run.output?.title || '')
+        && (MAIN_REF.test(summaryOf(run)) || !REF_LINE.test(summaryOf(run))));
+    const branchBuild = res.data.check_runs.find((run) => BRANCH_BUILD_SUMMARY.test(summaryOf(run)) && COPIED_REF.test(summaryOf(run)));
     const versionCheck = mainBuild || branchBuild || res.data.check_runs[0];
     core.info(`VERSION CHECK: ${JSON.stringify(versionCheck)}`);
 

@@ -132,6 +132,13 @@ class MigrateTest(unittest.TestCase):
         self.assertIn("needs: [build-worker]", wf)
         self.assertIn('image: "other"', wf)
 
+    def test_trailing_comment_is_not_a_leftover(self):
+        rc, out, _ = run({
+            ".github/workflows/pipeline-build.yml": BUILD,
+            "deploy/values/common.yaml": "image:\n  repository: ghcr.io/chirpwireless/svc\nsecrets:\n  - name: github # private ghcr.io/chirpwireless (note)\n",
+        })
+        self.assertEqual(rc, 0, out)
+
     def test_workflow_level_id_token_fails(self):
         wf = BUILD.replace("jobs:\n", "permissions:\n  id-token: write\njobs:\n")
         rc, out, _ = run({".github/workflows/pipeline-build.yml": wf, **DEPLOY_VALUES})

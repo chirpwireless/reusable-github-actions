@@ -34,7 +34,8 @@ ecr-copy-build:
   so `scripts/ecr-migrate-service.py` also makes the Auto Deploy of a migrated service start only from a branch build, when
   its copy is done. `version-fetch` alone cannot do this: a pull request build can end before the branch build has published
   its version. Auto Deploy runs from the default branch, so a service that merges into another branch first puts this guard
-on its default branch with a PR of its own.
+  on its default branch with a PR of its own. `version-fetch` picks a build of a ref the copy runs on, whichever is newer,
+  and a commit built only elsewhere keeps its version, so a service on ghcr deploys it as before.
 - A service that does not call this workflow gets no copy job, but every build and deploy uses `version-publish` and
   `version-fetch` at `@main`, so a merge here changes those two for all services at once.
 
