@@ -10,7 +10,7 @@ exports.publishVersion = async ({ github, context, core }) => {
         conclusion: 'success',
         output: {
             title: BUILD_VERSION,
-            summary: `version = ${BUILD_VERSION}`,
+            summary: `version = ${BUILD_VERSION}\nevent = ${context.eventName}\nref = ${context.ref}`,
         },
     });
 

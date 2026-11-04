@@ -10,6 +10,9 @@ on:
       new-version:
         description: "The new service version"
         value: ${{ jobs.generate-version.outputs.service-version }}
+      image-digest:
+        description: "Digest of the pushed image"
+        value: ${{ jobs.build.outputs.image_digest }}
 
 env:
   HOME: ${{github.workspace}}
@@ -32,6 +35,8 @@ jobs:
     runs-on:
       group: builder
     needs: [generate-version]
+    outputs:
+      image_digest: ${{ steps.push.outputs.digest }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -55,6 +60,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push Docker image
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: .

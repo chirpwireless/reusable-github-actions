@@ -1,0 +1,30 @@
+name: 'EcrCopy'
+description: >-
+  Copies one image from ghcr to ECR by digest, registry to registry, and proves the tag in ECR holds that digest.
+  Fails when the tag does not fit the branch of the build or already holds another digest. The role of the calling
+  repository is what limits it to its own images.
+
+inputs:
+  image:
+    description: "Image name under the organization, as in ghcr.io/<owner>/<image>"
+    required: true
+  version:
+    description: "Image tag"
+    required: true
+  digest:
+    description: "Digest of the pushed image, sha256:<hex>"
+    required: true
+  registry:
+    description: "ECR registry host (the AWS_ECR_REGISTRY Actions variable)"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        VERSION: ${{ inputs.version }}
+        DIGEST: ${{ inputs.digest }}
+        REGISTRY: ${{ inputs.registry }}
+      run: bash "$GITHUB_ACTION_PATH/copy.sh"
