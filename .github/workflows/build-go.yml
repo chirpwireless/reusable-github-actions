@@ -22,6 +22,10 @@ on:
         description: "A boolean flag to generate Swagger docs"
         type: boolean
         default: false
+      vet_integration:
+        description: "Also compile and vet the integration-tagged test suites (go vet -tags integration ./...). Needs no database or Docker; catches a suite that no longer compiles"
+        type: boolean
+        default: false
     outputs:
       new-version:
         description: "The new service version"
@@ -99,6 +103,10 @@ jobs:
       - name: Run tests
         run: |
           cd ${{ inputs.app_dir}} && go mod download && go test -v ./... -cover -coverprofile=coverage.txt
+      - name: Vet integration-tagged tests
+        if: ${{ inputs.vet_integration == true }}
+        run: |
+          cd ${{ inputs.app_dir}} && go vet -tags integration ./...
       - name: Run linter
         uses: golangci/golangci-lint-action@v6
         if: ${{ inputs.skip_linter == false && startsWith(inputs.golangci_lint_version, 'v1.') }}
