@@ -15,7 +15,6 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      checks: write
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
     steps:
@@ -78,18 +77,25 @@ jobs:
             cd -
           done
 
+  # Separate job so that a pull request never gets checks: write: the job is not created for it.
+  publish-version:
+    if: contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]')
+    runs-on: ubuntu-24.04
+    needs: [terraform-validate]
+    permissions:
+      checks: write
+    steps:
       - name: Publish Version
-        if: contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name)
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
-          build-version: ${{ steps.version.outputs.new_version }}
+          build-version: ${{ needs.terraform-validate.outputs.new_version }}
 
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
       group: hetzner-k3s-dev
-    needs: [terraform-validate]
+    needs: [terraform-validate, publish-version]
     permissions:
       contents: write
     steps:

@@ -40,6 +40,40 @@ jobs:
     needs: [generate-version]
     permissions:
       contents: read
+      packages: read
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    strategy:
+      matrix:
+        combo: ${{ fromJson(inputs.config) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup NodeJS
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+      - name: Prepare .env.local file
+        run: |
+          echo "${{ vars[matrix.combo.env_local] }}" > .env.local
+      - name: Install Yarn
+        run: |
+          npm install -g yarn@1.22.22
+      - name: Install yarn dependencies
+        run: yarn install --frozen-lockfile
+      - name: Run build
+        run: yarn build
+
+  # Separate job so that a pull request never gets the write token: the job is not created for it.
+  publish:
+    if: inputs.publish && contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]')
+    runs-on:
+      group: builder
+    needs: [generate-version, build]
+    permissions:
+      contents: read
       packages: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -66,7 +100,6 @@ jobs:
       - name: Run build
         run: yarn build
       - name: Publish package
-        if: ${{ inputs.publish && contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -82,7 +115,7 @@ jobs:
   publish-version:
     if: inputs.publish && contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name)
     runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
-    needs: [generate-version, build]
+    needs: [generate-version, build, publish]
     permissions:
       checks: write
     steps:
@@ -93,10 +126,10 @@ jobs:
           build-version: ${{ needs.generate-version.outputs.service-version }}
 
   publish-release:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && inputs.release
+    if: ${{ !failure() && !cancelled() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && inputs.release }}
     runs-on:
       group: hetzner-k3s-dev
-    needs: [generate-version, build]
+    needs: [generate-version, build, publish]
     permissions:
       contents: write
     steps:

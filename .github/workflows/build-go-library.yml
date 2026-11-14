@@ -26,32 +26,8 @@ jobs:
         with:
           go-version-file: "go.mod"
           cache-dependency-path: "go.sum"
-      - uses: actions/create-github-app-token@v1
-        if: ${{ contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
-        id: app-token-chirp-wireless
-        with:
-          app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
-          private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
-          owner: "chirpwireless"
-          permission-contents: read
-      - uses: actions/create-github-app-token@v1
-        if: ${{ contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
-        id: app-token-chirp-depin
-        with:
-          app-id: ${{ secrets.CHIRP_DEPIN_BUILDER_APP_ID }}
-          private-key: ${{ secrets.CHIRP_DEPIN_BUILDER_PRIVATE_KEY }}
-          owner: "chirpdepin"
-          permission-contents: read
-      - name: Configure Git to use installation token
-        if: ${{ contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
-        env:
-          TOKEN_CHIRPWIRELESS: ${{ steps.app-token-chirp-wireless.outputs.token }}
-          TOKEN_CHIRPDEPIN: ${{ steps.app-token-chirp-depin.outputs.token }}
-        run: |
-          git config --global url."https://x-access-token:${TOKEN_CHIRPWIRELESS}@github.com/chirpwireless/".insteadOf "https://github.com/chirpwireless/"
-          git config --global url."https://x-access-token:${TOKEN_CHIRPDEPIN}@github.com/chirpdepin/".insteadOf "https://github.com/chirpdepin/"
       - name: Configure Git to use a read-only token
-        if: ${{ github.event_name == 'pull_request' && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
+        if: ${{ !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
         env:
           TOKEN_CHIRPWIRELESS: ${{ secrets.GO_MODULES_READ_TOKEN }}
           TOKEN_CHIRPDEPIN: ${{ secrets.GO_MODULES_READ_TOKEN_DEPIN }}

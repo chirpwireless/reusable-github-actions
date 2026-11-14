@@ -36,6 +36,42 @@ jobs:
     needs: [generate-version]
     permissions:
       contents: read
+      packages: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Keep Docker credentials out of the build context
+        run: echo "DOCKER_CONFIG=${RUNNER_TEMP}/docker-config" >> "$GITHUB_ENV"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
+
+  # Separate job so that a pull request never gets the write token: the job is not created for it.
+  publish:
+    if: contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]')
+    runs-on:
+      group: hetzner-k3s-dev
+    needs: [generate-version, build]
+    permissions:
+      contents: read
       packages: write
     steps:
       - name: Checkout code
@@ -61,13 +97,13 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) }}
+          push: true
           tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
 
   publish-version:
     if: contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name)
     runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
-    needs: [generate-version, build]
+    needs: [generate-version, build, publish]
     permissions:
       checks: write
     steps:
@@ -81,7 +117,7 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
       group: hetzner-k3s-dev
-    needs: [generate-version, build]
+    needs: [generate-version, build, publish]
     permissions:
       contents: write
     steps:
