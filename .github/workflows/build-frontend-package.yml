@@ -21,8 +21,7 @@ env:
 
 jobs:
   generate-version:
-    runs-on:
-      group: hetzner-k3s-dev
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
@@ -34,8 +33,7 @@ jobs:
           echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
 
   build:
-    runs-on:
-      group: builder
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"builder"}') }}
     needs: [generate-version]
     strategy:
       matrix:
@@ -58,7 +56,7 @@ jobs:
       - name: Run build
         run: yarn build
       - name: Publish package
-        if: ${{ inputs.publish }}
+        if: ${{ inputs.publish && github.event_name != 'pull_request' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -72,9 +70,8 @@ jobs:
           yarn publish --no-git-tag-version
 
   publish-version:
-    if: inputs.publish
-    runs-on:
-      group: hetzner-k3s-dev
+    if: inputs.publish && github.event_name != 'pull_request'
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
     needs: [generate-version, build]
     permissions:
       checks: write

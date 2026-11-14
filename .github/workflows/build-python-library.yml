@@ -28,8 +28,7 @@ env:
 
 jobs:
   build:
-    runs-on:
-      group: builder
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"builder"}') }}
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
@@ -71,8 +70,8 @@ jobs:
           path: dist/
 
   publish-version:
-    runs-on:
-      group: builder
+    if: github.event_name != 'pull_request'
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"builder"}') }}
     needs: [build]
     permissions:
       checks: write

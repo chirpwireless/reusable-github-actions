@@ -32,8 +32,7 @@ env:
 
 jobs:
   build:
-    runs-on:
-      group: builder
+    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"builder"}') }}
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
     env:
@@ -69,18 +68,23 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/create-github-app-token@v1
+        if: github.actor != 'dependabot[bot]'
         id: app-token-chirp-wireless
         with:
           app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
           private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
           owner: "chirpwireless"
+          permission-contents: read
       - uses: actions/create-github-app-token@v1
+        if: github.actor != 'dependabot[bot]'
         id: app-token-chirp-depin
         with:
           app-id: ${{ secrets.CHIRP_DEPIN_BUILDER_APP_ID }}
           private-key: ${{ secrets.CHIRP_DEPIN_BUILDER_PRIVATE_KEY }}
           owner: "chirpdepin"
+          permission-contents: read
       - name: Configure Git to use installation token
+        if: github.actor != 'dependabot[bot]'
         run: |
           git config --global url."https://x-access-token:${{ steps.app-token-chirp-wireless.outputs.token }}@github.com/chirpwireless/".insteadOf "https://github.com/chirpwireless/"
           git config --global url."https://x-access-token:${{ steps.app-token-chirp-depin.outputs.token }}@github.com/chirpdepin/".insteadOf "https://github.com/chirpdepin/"
@@ -125,11 +129,15 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ env.docker_tag }}:${{ steps.version.outputs.new_version }}
           cache-from: type=registry,ref=${{ env.docker_tag }}:buildcache
-          cache-to: type=registry,ref=${{ env.docker_tag }}:buildcache,mode=max
+          cache-to: ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}:buildcache,mode=max', env.docker_tag) || '' }}
+      - name: Remove credentials
+        if: always()
+        run: rm -f ~/.gitconfig ~/.netrc
       - name: Publish Version
+        if: github.event_name != 'pull_request'
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
