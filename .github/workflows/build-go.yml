@@ -32,7 +32,11 @@ env:
 
 jobs:
   build:
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"builder"}') }}
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"builder"}') }}
+    permissions:
+      contents: read
+      packages: write
+      checks: write
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
     env:
@@ -68,7 +72,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/create-github-app-token@v1
-        if: github.actor != 'dependabot[bot]'
+        if: ${{ contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
         id: app-token-chirp-wireless
         with:
           app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
@@ -76,7 +80,7 @@ jobs:
           owner: "chirpwireless"
           permission-contents: read
       - uses: actions/create-github-app-token@v1
-        if: github.actor != 'dependabot[bot]'
+        if: ${{ contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
         id: app-token-chirp-depin
         with:
           app-id: ${{ secrets.CHIRP_DEPIN_BUILDER_APP_ID }}
@@ -84,11 +88,26 @@ jobs:
           owner: "chirpdepin"
           permission-contents: read
       - name: Configure Git to use installation token
-        if: github.actor != 'dependabot[bot]'
+        if: ${{ contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
+        env:
+          TOKEN_CHIRPWIRELESS: ${{ steps.app-token-chirp-wireless.outputs.token }}
+          TOKEN_CHIRPDEPIN: ${{ steps.app-token-chirp-depin.outputs.token }}
         run: |
-          git config --global url."https://x-access-token:${{ steps.app-token-chirp-wireless.outputs.token }}@github.com/chirpwireless/".insteadOf "https://github.com/chirpwireless/"
-          git config --global url."https://x-access-token:${{ steps.app-token-chirp-depin.outputs.token }}@github.com/chirpdepin/".insteadOf "https://github.com/chirpdepin/"
-          printf "${{ secrets.GITLAB_NETRC }}" > ~/.netrc
+          git config --global url."https://x-access-token:${TOKEN_CHIRPWIRELESS}@github.com/chirpwireless/".insteadOf "https://github.com/chirpwireless/"
+          git config --global url."https://x-access-token:${TOKEN_CHIRPDEPIN}@github.com/chirpdepin/".insteadOf "https://github.com/chirpdepin/"
+      - name: Configure Git to use a read-only token
+        if: ${{ github.event_name == 'pull_request' && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
+        env:
+          TOKEN_CHIRPWIRELESS: ${{ secrets.GO_MODULES_READ_TOKEN }}
+          TOKEN_CHIRPDEPIN: ${{ secrets.GO_MODULES_READ_TOKEN_DEPIN }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN_CHIRPWIRELESS}@github.com/chirpwireless/".insteadOf "https://github.com/chirpwireless/"
+          git config --global url."https://x-access-token:${TOKEN_CHIRPDEPIN}@github.com/chirpdepin/".insteadOf "https://github.com/chirpdepin/"
+      - name: Configure GitLab netrc
+        if: ${{ !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
+        env:
+          GITLAB_NETRC: ${{ secrets.GITLAB_NETRC }}
+        run: printf "$GITLAB_NETRC" > ~/.netrc
       - name: Generate swagger docs
         if: ${{ inputs.generate_docs == true }}
         env:
@@ -117,6 +136,9 @@ jobs:
           version: ${{ inputs.golangci_lint_version }}
           working-directory: ${{ inputs.app_dir }}
           args: --timeout=10m
+      - name: Remove credentials
+        if: always()
+        run: rm -f ~/.gitconfig ~/.netrc
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
@@ -129,15 +151,12 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) }}
           tags: ${{ env.docker_tag }}:${{ steps.version.outputs.new_version }}
           cache-from: type=registry,ref=${{ env.docker_tag }}:buildcache
-          cache-to: ${{ github.event_name != 'pull_request' && format('type=registry,ref={0}:buildcache,mode=max', env.docker_tag) || '' }}
-      - name: Remove credentials
-        if: always()
-        run: rm -f ~/.gitconfig ~/.netrc
+          cache-to: ${{ contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) && format('type=registry,ref={0}:buildcache,mode=max', env.docker_tag) || '' }}
       - name: Publish Version
-        if: github.event_name != 'pull_request'
+        if: contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name)
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -148,6 +167,8 @@ jobs:
     runs-on:
       group: hetzner-k3s-dev
     needs: [build]
+    permissions:
+      contents: write
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
         with:

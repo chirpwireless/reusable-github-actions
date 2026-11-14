@@ -16,11 +16,15 @@ env:
 
 jobs:
   generate-version:
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
+    permissions:
+      contents: read
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - id: version
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
       - name: "Create a summary"
@@ -28,11 +32,16 @@ jobs:
           echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
 
   build:
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
     needs: [generate-version]
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
@@ -45,12 +54,12 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) }}
           tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
 
   publish-version:
-    if: github.event_name != 'pull_request'
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
+    if: contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name)
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
     needs: [generate-version, build]
     permissions:
       checks: write
@@ -66,6 +75,8 @@ jobs:
     runs-on:
       group: hetzner-k3s-dev
     needs: [generate-version, build]
+    permissions:
+      contents: write
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
         with:

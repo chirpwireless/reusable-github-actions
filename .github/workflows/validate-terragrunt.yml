@@ -38,6 +38,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - id: version
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
@@ -47,7 +49,7 @@ jobs:
           echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
 
       - uses: actions/create-github-app-token@v1
-        if: github.actor != 'dependabot[bot]'
+        if: ${{ contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
         id: app-token
         with:
           app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
@@ -76,7 +78,7 @@ jobs:
           # One provider download shared by all units instead of one per unit
           TG_PROVIDER_CACHE: "true"
           # Configure Git to use installation token
-          INPUT_PRE_EXEC_1: ${{ steps.app-token.outputs.token != '' && format('git config --global url."https://x-access-token:{0}@github.com/".insteadOf "https://github.com/"', steps.app-token.outputs.token) || '' }}
+          INPUT_PRE_EXEC_1: ${{ (github.event_name == 'pull_request' && secrets.TERRAFORM_MODULES_READ_TOKEN || steps.app-token.outputs.token) != '' && format('git config --global url."https://x-access-token:{0}@github.com/".insteadOf "https://github.com/"', (github.event_name == 'pull_request' && secrets.TERRAFORM_MODULES_READ_TOKEN || steps.app-token.outputs.token)) || '' }}
         with:
           tf_path: "terraform"
           tg_version: ${{ inputs.tg_version }}
@@ -84,7 +86,7 @@ jobs:
           tg_command: "run --all validate"
 
       - name: Publish Version
-        if: github.event_name != 'pull_request'
+        if: contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name)
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -95,6 +97,8 @@ jobs:
     runs-on:
       group: hetzner-k3s-dev
     needs: [terragrunt-validate]
+    permissions:
+      contents: write
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
         with:

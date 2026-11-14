@@ -16,11 +16,15 @@ env:
 
 jobs:
   generate-version:
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
+    permissions:
+      contents: read
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - id: version
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
       - name: "Create a summary"
@@ -28,13 +32,16 @@ jobs:
           echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
 
   build-docker-image:
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
     needs: [generate-version]
     permissions:
-      contents: write
+      contents: read
+      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
@@ -47,17 +54,19 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) }}
           tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
 
   build-helm-chart:
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
     needs: [generate-version]
     permissions:
       contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Update Chart Versions
         run: |
           sed -i "s/^version: .*/version: ${{ needs.generate-version.outputs.service-version }}/" chart/Chart.yaml
@@ -77,7 +86,7 @@ jobs:
       # Popular action to deploy to GitHub Pages:
       # Docs: https://github.com/peaceiris/actions-gh-pages#%EF%B8%8F-docusaurus
       - name: Deploy to GitHub Pages
-        if: github.event_name != 'pull_request'
+        if: contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name)
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -95,8 +104,8 @@ jobs:
           user_email: 41898282+github-actions[bot]@users.noreply.github.com
 
   publish-version:
-    if: github.event_name != 'pull_request'
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
+    if: contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name)
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
     needs: [generate-version, build-docker-image, build-helm-chart]
     permissions:
       checks: write
@@ -112,6 +121,8 @@ jobs:
     runs-on:
       group: hetzner-k3s-dev
     needs: [generate-version, build-docker-image, build-helm-chart]
+    permissions:
+      contents: write
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
         with:
