@@ -49,6 +49,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Keep Docker credentials out of the build context
+        run: echo "DOCKER_CONFIG=${RUNNER_TEMP}/docker-config" >> "$GITHUB_ENV"
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry

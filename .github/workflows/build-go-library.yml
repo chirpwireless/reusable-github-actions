@@ -62,7 +62,7 @@ jobs:
         if: ${{ !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
         env:
           GITLAB_NETRC: ${{ secrets.GITLAB_NETRC }}
-        run: printf "$GITLAB_NETRC" > "${HOME}/.netrc"
+        run: printf '%b' "$GITLAB_NETRC" > "${HOME}/.netrc"
       - name: Install dependencies
         run: make install
       - name: Run build

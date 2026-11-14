@@ -107,7 +107,7 @@ jobs:
         if: ${{ !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
         env:
           GITLAB_NETRC: ${{ secrets.GITLAB_NETRC }}
-        run: printf "$GITLAB_NETRC" > ~/.netrc
+        run: printf '%b' "$GITLAB_NETRC" > ~/.netrc
       - name: Generate swagger docs
         if: ${{ inputs.generate_docs == true }}
         env:
@@ -139,6 +139,8 @@ jobs:
       - name: Remove credentials
         if: always()
         run: rm -f ~/.gitconfig ~/.netrc
+      - name: Keep Docker credentials out of the build context
+        run: echo "DOCKER_CONFIG=${RUNNER_TEMP}/docker-config" >> "$GITHUB_ENV"
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
