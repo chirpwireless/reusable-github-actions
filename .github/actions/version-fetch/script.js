@@ -31,17 +31,8 @@ async function listChecks({github, context, ref, checkName}) {
 
 async function fetchVersionFromCheck({github, context, core}) {
     const {GIT_REF, CHECK_NAME} = process.env;
-    const repo = context.repo.repo;
 
-    const res = await github.rest.checks.listForRef({
-        owner: context.repo.owner,
-        repo,
-        ref: GIT_REF,
-        status: 'completed',
-        check_name: CHECK_NAME,
-        filter: 'all',
-        per_page: 100,
-    });
+    const res = await listChecks({github, context, ref: GIT_REF, checkName: CHECK_NAME});
 
     if (res.data.total_count === 0) {
         core.info(`No published \`${CHECK_NAME}\` check found in ref '${GIT_REF}'.`);
@@ -95,8 +86,7 @@ exports.fetchVersion = async ({github, context, core}) => {
     return '';
 };
 
-const EXTRA_LINE = /^([A-Z][A-Z0-9_]*)=([a-z0-9:_-]+)$/;
-const RESERVED_NAME = /^(GITHUB_|RUNNER_|ACTIONS_|INPUT_|LD_|BASH_FUNC_)|^(PATH|BASH_ENV|ENV|HOME|SHELL|CI|NODE_OPTIONS|IFS|PS4|PROMPT_COMMAND)$/;
+const EXTRA_LINE = /^(VERSION_[A-Z0-9_]+)=([a-z0-9:_-]+)$/;
 const EXTRA_VALUE = /^[A-Za-z0-9._-]{1,128}$/;
 
 exports.parseExtraVersions = (text) => {
@@ -108,12 +98,9 @@ exports.parseExtraVersions = (text) => {
         }
         const match = EXTRA_LINE.exec(line);
         if (!match) {
-            throw new Error(`Invalid extra-versions line '${line}': expected NAME=check-name`);
+            throw new Error(`Invalid extra-versions line '${line}': expected VERSION_NAME=check-name`);
         }
         const [, name, checkName] = match;
-        if (name === 'VERSION' || RESERVED_NAME.test(name)) {
-            throw new Error(`Invalid extra-versions line '${line}': the name ${name} is reserved`);
-        }
         if (seen.has(name)) {
             throw new Error(`Invalid extra-versions line '${line}': the name ${name} is repeated`);
         }

@@ -305,9 +305,21 @@ jobs:
             echo "::error::the build is not reproducible: built $built, registry $REGISTRY_CONFIG"
             exit 1
           fi
-      # A pull_request build checks out the merge ref: its content tag must not become the version of the PR head commit
+      - id: publishable
+        name: Check that the built commit is the one the version is published on
+        if: ${{ inputs.tag_mode == 'content' }}
+        shell: bash
+        env:
+          VERSION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ "$(git rev-parse HEAD)" = "$VERSION_SHA" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::the built commit differs from $VERSION_SHA (merge ref or base checkout): the version check is not published"
+          fi
       - name: Publish Version
-        if: ${{ inputs.tag_mode == 'calendar' || github.event_name != 'pull_request' }}
+        if: ${{ inputs.tag_mode == 'calendar' || steps.publishable.outputs.publish == 'true' }}
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
