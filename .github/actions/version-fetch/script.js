@@ -79,3 +79,61 @@ exports.fetchVersion = async ({github, context, core}) => {
     core.setFailed(`No version found for git sha '${GIT_REF}' ('${CHECK_NAME}') in either checks or releases.`);
     return '';
 };
+
+const EXTRA_LINE = /^([A-Z][A-Z0-9_]*)=([a-z0-9:_-]+)$/;
+const EXTRA_VALUE = /^[A-Za-z0-9._-]{1,128}$/;
+
+exports.parseExtraVersions = (text) => {
+    const seen = new Set();
+    const extras = [];
+    for (const line of (text || '').split('\n')) {
+        if (line.trim() === '') {
+            continue;
+        }
+        const match = EXTRA_LINE.exec(line);
+        if (!match) {
+            throw new Error(`Invalid extra-versions line '${line}': expected NAME=check-name`);
+        }
+        const [, name, checkName] = match;
+        if (name === 'VERSION') {
+            throw new Error(`Invalid extra-versions line '${line}': the name VERSION is reserved`);
+        }
+        if (seen.has(name)) {
+            throw new Error(`Invalid extra-versions line '${line}': the name ${name} is repeated`);
+        }
+        seen.add(name);
+        extras.push({name, checkName});
+    }
+    return extras;
+};
+
+exports.fetchExtra = async ({github, context, core}) => {
+    const {GIT_REF, EXTRA_VERSIONS} = process.env;
+    const lines = [];
+
+    for (const {name, checkName} of exports.parseExtraVersions(EXTRA_VERSIONS)) {
+        const res = await github.rest.checks.listForRef({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: GIT_REF,
+            status: 'completed',
+            check_name: checkName,
+            filter: 'all',
+            per_page: 100,
+        });
+
+        if (res.data.total_count === 0) {
+            core.warning(`No published \`${checkName}\` check found in ref '${GIT_REF}': ${name} is not set.`);
+            continue;
+        }
+
+        const value = res.data.check_runs[0].output?.title || '';
+        if (!EXTRA_VALUE.test(value)) {
+            core.setFailed(`The \`${checkName}\` check of ref '${GIT_REF}' carries an invalid version for ${name}.`);
+            return '';
+        }
+        lines.push(`${name}=${value}`);
+    }
+
+    return lines.join('\n');
+};

@@ -17,6 +17,10 @@ on:
         required: true
         description: "Path to the helm charts"
         type: string
+      extra_versions:
+        description: "Additional versions, one NAME=check-name per line"
+        type: string
+        default: ""
 
 env:
   HOME: /home/runner
@@ -27,11 +31,13 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{steps.fetch-version.outputs.version}}
+      extra_env: ${{steps.fetch-version.outputs.extra-env}}
     steps:
       - id: fetch-version
         uses: chirpwireless/reusable-github-actions/.github/actions/version-fetch@main
         with:
           git-ref: ${{ inputs.version }}
+          extra-versions: ${{ inputs.extra_versions }}
       - run: |
           echo "Deploying the version ${{steps.fetch-version.outputs.version}}" > $GITHUB_STEP_SUMMARY
 
@@ -65,6 +71,11 @@ jobs:
             echo "::error::image $VERSION is not a $base build: production deploys only images built from $base"
             exit 1
           fi
+      - name: Export the additional versions
+        env:
+          EXTRA_ENV: ${{ needs.fetch_version.outputs.extra_env }}
+        run: |
+          [ -z "$EXTRA_ENV" ] || printf '%s\n' "$EXTRA_ENV" >> "$GITHUB_ENV"
       - name: Deploy using helmfile
         env:
           VERSION: ${{ needs.fetch_version.outputs.version }}
