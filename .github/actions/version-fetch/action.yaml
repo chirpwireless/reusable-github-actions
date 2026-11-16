@@ -11,7 +11,7 @@ inputs:
     required: false
     default: 'chirp:version'
   extra-versions:
-    description: 'Additional versions, one NAME=check-name per line. Each is read from the check-run of the same ref'
+    description: 'Additional versions, one VERSION_NAME=check-name per line. Each is read from the check-run of the same ref'
     required: false
     default: ''
   github-token:

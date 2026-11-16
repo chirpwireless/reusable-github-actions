@@ -18,7 +18,7 @@ on:
         description: "Path to the helm charts"
         type: string
       extra_versions:
-        description: "Additional versions, one NAME=check-name per line"
+        description: "Additional versions, one VERSION_NAME=check-name per line"
         type: string
         default: ""
 
