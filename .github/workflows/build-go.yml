@@ -305,7 +305,9 @@ jobs:
             echo "::error::the build is not reproducible: built $built, registry $REGISTRY_CONFIG"
             exit 1
           fi
+      # A pull_request build checks out the merge ref: its content tag must not become the version of the PR head commit
       - name: Publish Version
+        if: ${{ inputs.tag_mode == 'calendar' || github.event_name != 'pull_request' }}
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}

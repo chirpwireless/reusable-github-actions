@@ -124,27 +124,17 @@ exports.parseExtraVersions = (text) => {
 };
 
 exports.fetchExtra = async ({github, context, core}) => {
-    const {GIT_REF, CHECK_NAME, EXTRA_VERSIONS} = process.env;
-    const extras = exports.parseExtraVersions(EXTRA_VERSIONS);
-
-    const main = await listChecks({github, context, ref: GIT_REF, checkName: CHECK_NAME});
-    const mainRun = main.data.total_count === 0 ? undefined : selectVersionRun(main.data.check_runs);
-    const suiteId = mainRun?.check_suite?.id;
-    if (!suiteId) {
-        core.warning(`No check suite of the main version \`${CHECK_NAME}\` in ref '${GIT_REF}': no extra version is set.`);
-        return '';
-    }
-
+    const {GIT_REF, EXTRA_VERSIONS} = process.env;
     const lines = [];
-    for (const {name, checkName} of extras) {
+
+    for (const {name, checkName} of exports.parseExtraVersions(EXTRA_VERSIONS)) {
         const res = await listChecks({github, context, ref: GIT_REF, checkName});
-        const run = res.data.check_runs.find((r) => r.check_suite?.id === suiteId);
-        if (!run) {
-            core.warning(`No published \`${checkName}\` check of the build that produced the main version in ref '${GIT_REF}': ${name} is not set.`);
+        if (res.data.total_count === 0) {
+            core.warning(`No published \`${checkName}\` check found in ref '${GIT_REF}': ${name} is not set.`);
             continue;
         }
 
-        const value = run.output?.title || '';
+        const value = res.data.check_runs[0].output?.title || '';
         if (!EXTRA_VALUE.test(value)) {
             core.setFailed(`The \`${checkName}\` check of ref '${GIT_REF}' carries an invalid version for ${name}.`);
             return '';
