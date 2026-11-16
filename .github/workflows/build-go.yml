@@ -163,7 +163,8 @@ jobs:
               "$root"/*) ;;
               *) echo "::error::path outside the repository: $path"; exit 1 ;;
             esac
-            printf '%s\t%s\n' "$path" "$(sha256sum -- "$path" | cut -d' ' -f1)" >> "$list"
+            sum=$(sha256sum -- "$path")
+            printf '%s\t%s\n' "$path" "${sum%% *}" >> "$list"
           done < "$paths"
           printf 'buildkit\t%s\n' "$BUILDKIT_IMAGE" >> "$list"
           LC_ALL=C sort "$list" -o "$list"
@@ -210,16 +211,22 @@ jobs:
         run: |
           set -uo pipefail
           manifest="$RUNNER_TEMP/registry-manifest.json"
-          if out=$(docker buildx imagetools inspect --raw "$IMAGE:$TAG" 2>&1); then
-            printf '%s' "$out" > "$manifest"
+          errfile="$RUNNER_TEMP/registry-inspect.err"
+          if docker buildx imagetools inspect --raw "$IMAGE:$TAG" > "$manifest" 2> "$errfile"; then
             media=$(jq -r '.mediaType // empty' "$manifest")
             case "$media" in
               application/vnd.docker.distribution.manifest.v2+json|application/vnd.oci.image.manifest.v1+json) ;;
               *) echo "::error::$IMAGE:$TAG is not a single-platform image manifest (mediaType '$media')"; exit 1 ;;
             esac
+            config=$(jq -r '.config.digest // empty' "$manifest")
+            if ! printf '%s' "$config" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+              echo "::error::$IMAGE:$TAG has no valid config digest in the registry manifest"
+              exit 1
+            fi
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "config=$(jq -r '.config.digest' "$manifest")" >> "$GITHUB_OUTPUT"
+            echo "config=$config" >> "$GITHUB_OUTPUT"
           else
+            out=$(cat "$errfile")
             case "$out" in
               *": not found") echo "exists=false" >> "$GITHUB_OUTPUT" ;;
               *) echo "::error::cannot inspect $IMAGE:$TAG: $out"; exit 1 ;;
@@ -283,7 +290,9 @@ jobs:
           set -uo pipefail
           built=$(printf '%s' "$METADATA" | jq -r '.["containerimage.config.digest"] // empty')
           if ! printf '%s' "$built" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
-            echo "content-image tag=$TAG built_config=missing registry_config=${REGISTRY_CONFIG:-absent} pushed=false"
+            pushed=true
+            [ "$EXISTS" != "true" ] || pushed=false
+            echo "content-image tag=$TAG built_config=missing registry_config=${REGISTRY_CONFIG:-absent} pushed=$pushed"
             echo "::error::the build did not report a config digest"
             exit 1
           fi

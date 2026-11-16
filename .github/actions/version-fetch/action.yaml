@@ -69,6 +69,7 @@ runs:
       uses: actions/github-script@v7
       env:
         GIT_REF: ${{ steps.fetch-ref.outputs.result }}
+        CHECK_NAME: ${{ inputs.check-name }}
         EXTRA_VERSIONS: ${{ inputs.extra-versions }}
       with:
         result-encoding: string

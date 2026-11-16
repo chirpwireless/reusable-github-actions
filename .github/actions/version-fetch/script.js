@@ -13,6 +13,22 @@ async function fetchRelease({github, context, core}) {
     return res.data.tag_name;
 }
 
+function selectVersionRun(runs) {
+    return runs.find((run) => MAIN_BUILD_VERSION.test(run.output?.title || '')) || runs[0];
+}
+
+async function listChecks({github, context, ref, checkName}) {
+    return github.rest.checks.listForRef({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        ref,
+        status: 'completed',
+        check_name: checkName,
+        filter: 'all',
+        per_page: 100,
+    });
+}
+
 async function fetchVersionFromCheck({github, context, core}) {
     const {GIT_REF, CHECK_NAME} = process.env;
     const repo = context.repo.repo;
@@ -33,8 +49,7 @@ async function fetchVersionFromCheck({github, context, core}) {
     }
 
     // A pull request build publishes its merge-ref image on the PR head commit, so a main commit can carry both.
-    const mainBuild = res.data.check_runs.find((run) => MAIN_BUILD_VERSION.test(run.output?.title || ''));
-    const versionCheck = mainBuild || res.data.check_runs[0];
+    const versionCheck = selectVersionRun(res.data.check_runs);
     core.info(`VERSION CHECK: ${JSON.stringify(versionCheck)}`);
 
     const version = versionCheck.output.title;
@@ -81,6 +96,7 @@ exports.fetchVersion = async ({github, context, core}) => {
 };
 
 const EXTRA_LINE = /^([A-Z][A-Z0-9_]*)=([a-z0-9:_-]+)$/;
+const RESERVED_NAME = /^(GITHUB_|RUNNER_|ACTIONS_|INPUT_|LD_|BASH_FUNC_)|^(PATH|BASH_ENV|ENV|HOME|SHELL|CI|NODE_OPTIONS|IFS|PS4|PROMPT_COMMAND)$/;
 const EXTRA_VALUE = /^[A-Za-z0-9._-]{1,128}$/;
 
 exports.parseExtraVersions = (text) => {
@@ -95,8 +111,8 @@ exports.parseExtraVersions = (text) => {
             throw new Error(`Invalid extra-versions line '${line}': expected NAME=check-name`);
         }
         const [, name, checkName] = match;
-        if (name === 'VERSION') {
-            throw new Error(`Invalid extra-versions line '${line}': the name VERSION is reserved`);
+        if (name === 'VERSION' || RESERVED_NAME.test(name)) {
+            throw new Error(`Invalid extra-versions line '${line}': the name ${name} is reserved`);
         }
         if (seen.has(name)) {
             throw new Error(`Invalid extra-versions line '${line}': the name ${name} is repeated`);
@@ -108,26 +124,27 @@ exports.parseExtraVersions = (text) => {
 };
 
 exports.fetchExtra = async ({github, context, core}) => {
-    const {GIT_REF, EXTRA_VERSIONS} = process.env;
+    const {GIT_REF, CHECK_NAME, EXTRA_VERSIONS} = process.env;
+    const extras = exports.parseExtraVersions(EXTRA_VERSIONS);
+
+    const main = await listChecks({github, context, ref: GIT_REF, checkName: CHECK_NAME});
+    const mainRun = main.data.total_count === 0 ? undefined : selectVersionRun(main.data.check_runs);
+    const suiteId = mainRun?.check_suite?.id;
+    if (!suiteId) {
+        core.warning(`No check suite of the main version \`${CHECK_NAME}\` in ref '${GIT_REF}': no extra version is set.`);
+        return '';
+    }
+
     const lines = [];
-
-    for (const {name, checkName} of exports.parseExtraVersions(EXTRA_VERSIONS)) {
-        const res = await github.rest.checks.listForRef({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            ref: GIT_REF,
-            status: 'completed',
-            check_name: checkName,
-            filter: 'all',
-            per_page: 100,
-        });
-
-        if (res.data.total_count === 0) {
-            core.warning(`No published \`${checkName}\` check found in ref '${GIT_REF}': ${name} is not set.`);
+    for (const {name, checkName} of extras) {
+        const res = await listChecks({github, context, ref: GIT_REF, checkName});
+        const run = res.data.check_runs.find((r) => r.check_suite?.id === suiteId);
+        if (!run) {
+            core.warning(`No published \`${checkName}\` check of the build that produced the main version in ref '${GIT_REF}': ${name} is not set.`);
             continue;
         }
 
-        const value = res.data.check_runs[0].output?.title || '';
+        const value = run.output?.title || '';
         if (!EXTRA_VALUE.test(value)) {
             core.setFailed(`The \`${checkName}\` check of ref '${GIT_REF}' carries an invalid version for ${name}.`);
             return '';
