@@ -46,4 +46,6 @@ runs:
           return fetchVersion({ github, context, core });
     - id: log-output
       shell: bash
-      run: echo ${{ steps.fetch-version.outputs.result }}
+      env:
+        VERSION: ${{ steps.fetch-version.outputs.result }}
+      run: echo "$VERSION"

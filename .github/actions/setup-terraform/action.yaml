@@ -1,0 +1,48 @@
+name: 'SetupTerraform'
+description: >-
+  Installs the Terraform CLI from releases.hashicorp.com with retries, a SHA256SUMS signature check against HashiCorp's release key (pinned fingerprint) and a checksum check.
+  Replaces hashicorp/setup-terraform, which fails with an AggregateError on runner network hiccups and cannot retry.
+
+inputs:
+  version:
+    description: "Terraform version"
+    default: "1.14.6"
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        KEY_FILE: ${{ github.action_path }}/hashicorp-release-key.asc
+        # Primary key of "HashiCorp Security (hashicorp.com/security)"; the key file must carry exactly this key.
+        KEY_FINGERPRINT: C874011F0AB405110D02105534365D9472D7468F
+      run: |
+        set -euo pipefail
+        command -v gpg >/dev/null || { echo "::error::gpg is required to verify the Terraform release signature"; exit 1; }
+        curl_retry=(curl -fsSL --retry 6 --retry-all-errors --retry-delay 5 --connect-timeout 20 --max-time 180)
+        [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::invalid Terraform version '$VERSION'"; exit 1; }
+        case "$(uname -m)" in
+          x86_64) arch=amd64 ;;
+          aarch64|arm64) arch=arm64 ;;
+          *) echo "::error::unsupported architecture $(uname -m)"; exit 1 ;;
+        esac
+        base="https://releases.hashicorp.com/terraform/${VERSION}"
+        zip="terraform_${VERSION}_linux_${arch}.zip"
+        dir="$RUNNER_TEMP/terraform-${VERSION}"
+        mkdir -p "$dir"
+        "${curl_retry[@]}" -o "$dir/$zip" "$base/$zip"
+        "${curl_retry[@]}" -o "$dir/SHA256SUMS" "$base/terraform_${VERSION}_SHA256SUMS"
+        "${curl_retry[@]}" -o "$dir/SHA256SUMS.sig" "$base/terraform_${VERSION}_SHA256SUMS.sig"
+        export GNUPGHOME="$dir/gnupg"
+        mkdir -m 700 "$GNUPGHOME"
+        gpg --batch --quiet --import "$KEY_FILE"
+        [ "$(gpg --batch --with-colons --fingerprint | awk -F: '/^fpr/ {print $10; exit}')" = "$KEY_FINGERPRINT" ] \
+          || { echo "::error::the bundled HashiCorp key does not have the pinned fingerprint"; exit 1; }
+        gpg --batch --status-fd 1 --verify "$dir/SHA256SUMS.sig" "$dir/SHA256SUMS" 2>/dev/null \
+          | awk -v fpr="$KEY_FINGERPRINT" '$2 == "VALIDSIG" && $NF == fpr { ok = 1 } END { exit !ok }' \
+          || { echo "::error::SHA256SUMS for Terraform ${VERSION} is not signed by the HashiCorp release key"; exit 1; }
+        (cd "$dir" && grep " $zip\$" SHA256SUMS | sha256sum -c -)
+        unzip -o -q "$dir/$zip" -d "$dir"
+        echo "$dir" >> "$GITHUB_PATH"
+        "$dir/terraform" version

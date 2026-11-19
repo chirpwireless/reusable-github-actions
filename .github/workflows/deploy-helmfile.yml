@@ -32,8 +32,10 @@ jobs:
         uses: chirpwireless/reusable-github-actions/.github/actions/version-fetch@main
         with:
           git-ref: ${{ inputs.version }}
-      - run: |
-          echo "Deploying the version ${{steps.fetch-version.outputs.version}}" > $GITHUB_STEP_SUMMARY
+      - env:
+          VERSION: ${{ steps.fetch-version.outputs.version }}
+        run: |
+          echo "Deploying the version $VERSION" > "$GITHUB_STEP_SUMMARY"
 
   deploy:
     name: "Deploy to ${{inputs.environment}}"
