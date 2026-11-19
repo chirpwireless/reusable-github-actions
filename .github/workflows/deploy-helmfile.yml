@@ -17,6 +17,10 @@ on:
         required: true
         description: "Path to the helm charts"
         type: string
+      extra_versions:
+        description: "Additional versions, one VERSION_NAME=check-name per line, exported to the helmfile step. A commit without the check gets no variable: read it with requiredEnv"
+        type: string
+        default: ""
 
 env:
   HOME: /home/runner
@@ -27,13 +31,19 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{steps.fetch-version.outputs.version}}
+      extra_env: ${{steps.fetch-version.outputs.extra-env}}
     steps:
       - id: fetch-version
         uses: chirpwireless/reusable-github-actions/.github/actions/version-fetch@main
         with:
           git-ref: ${{ inputs.version }}
-      - run: |
-          echo "Deploying the version ${{steps.fetch-version.outputs.version}}" > $GITHUB_STEP_SUMMARY
+          extra-versions: ${{ inputs.extra_versions }}
+          production: ${{ inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod' }}
+      - env:
+          VERSION: ${{ steps.fetch-version.outputs.version }}
+          EXTRA_ENV: ${{ steps.fetch-version.outputs.extra-env }}
+        run: |
+          { printf 'Deploying the version %s\n' "$VERSION"; [ -z "$EXTRA_ENV" ] || printf '%s\n' "$EXTRA_ENV"; } > "$GITHUB_STEP_SUMMARY"
 
   deploy:
     name: "Deploy to ${{inputs.environment}}"
@@ -65,6 +75,16 @@ jobs:
             echo "::error::image $VERSION is not a $base build: production deploys only images built from $base"
             exit 1
           fi
+      - name: Export the additional versions
+        env:
+          EXTRA_ENV: ${{ needs.fetch_version.outputs.extra_env }}
+        run: |
+          [ -n "$EXTRA_ENV" ] || exit 0
+          if LC_ALL=C grep -Evxq 'VERSION_[A-Z0-9_]+=[A-Za-z0-9_][A-Za-z0-9._-]{0,127}' <<< "$EXTRA_ENV"; then
+            echo "::error::an additional version is not a VERSION_NAME=tag line"
+            exit 1
+          fi
+          printf '%s\n' "$EXTRA_ENV" >> "$GITHUB_ENV"
       - name: Deploy using helmfile
         env:
           VERSION: ${{ needs.fetch_version.outputs.version }}

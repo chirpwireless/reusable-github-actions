@@ -1,0 +1,49 @@
+name: 'Content tag'
+description: 'Computes an image tag from the content of its inputs and tells whether the version check may go on the commit'
+
+inputs:
+  inputs-cmd:
+    description: 'Command run from the repository root that prints the input file paths, one per line'
+    required: true
+  dockerfile:
+    description: 'Path to the Dockerfile from the repository root; always part of the inputs'
+    required: true
+  buildkit-image:
+    description: 'BuildKit image with digest used for the build; part of the tag'
+    required: true
+  version-sha:
+    description: 'Commit the version check is published on'
+    required: true
+
+outputs:
+  tag:
+    description: 'c- and 16 hex characters'
+    value: ${{ steps.tag.outputs.tag }}
+  publish:
+    description: 'true when the checked-out commit is the version commit, so its version check may be published'
+    value: ${{ steps.publishable.outputs.publish }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: tag
+      shell: bash
+      env:
+        CONTENT_INPUTS_CMD: ${{ inputs.inputs-cmd }}
+        DOCKERFILE: ${{ inputs.dockerfile }}
+        BUILDKIT_IMAGE: ${{ inputs.buildkit-image }}
+      run: |
+        tag=$("$GITHUB_ACTION_PATH/content-tag.sh")
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+    - id: publishable
+      shell: bash
+      env:
+        VERSION_SHA: ${{ inputs.version-sha }}
+      run: |
+        built=$(git rev-parse HEAD)
+        if [ "$built" = "$VERSION_SHA" ]; then
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "publish=false" >> "$GITHUB_OUTPUT"
+          echo "::notice::the built commit $built is not $VERSION_SHA (merge ref or base checkout): the version check is not published"
+        fi
