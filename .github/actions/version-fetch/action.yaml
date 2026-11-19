@@ -15,7 +15,7 @@ inputs:
     required: false
     default: ''
   production:
-    description: 'true for a production deploy: an additional version must then be a main build version or a content tag'
+    description: 'true for a production deploy: an additional version must then be a content tag'
     required: false
     default: 'false'
   github-token:

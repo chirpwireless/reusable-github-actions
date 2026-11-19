@@ -27,14 +27,16 @@ printf x >> a.txt; [ "$(tag "printf '%s\n' a.txt sub/b.txt")" != "$t1" ] && ok "
 repo; printf 'RUN x\n' >> Dockerfile; [ "$(tag "printf '%s\n' a.txt sub/b.txt")" != "$t1" ] && ok "the Dockerfile is an input" || bad "Dockerfile not an input"
 repo; [ "$(BK=moby/buildkit:v2@sha256:y tag "printf '%s\n' a.txt sub/b.txt")" != "$t1" ] && ok "the BuildKit image is an input" || bad "BuildKit not an input"
 
-repo; ln -s a.txt link.txt; ln -s .. sub/up; mkdir dir
+repo; ln -s a.txt link.txt; mkdir -p "$T/outside" dir; printf x > "$T/outside/x.txt"; ln -s "$T/outside" sub/out; printf c > $'cr.txt\r'
 for case in "absolute|printf '%s\n' $T/r/a.txt" "missing|echo nope.txt" "directory|echo dir" "symlink|echo link.txt" \
-            "outside|echo ../x.txt" "through a symlinked directory|echo sub/up/r/a.txt" "carriage return|printf 'a.txt\r\n'" \
+            "outside|echo ../x.txt" "through a symlinked directory|echo sub/out/x.txt" "carriage return|printf 'cr.txt\r\n'" \
+            "dot-dot segment|echo sub/../a.txt" "dot segment|echo sub/./b.txt" "double slash|echo sub//b.txt" \
             "command fails|echo a.txt; false" "no output|true" "only blank lines|printf '\n\n'"; do
   name=${case%%|*}; cmd=${case#*|}
   [ "$name" = outside ] && printf x > "$T/x.txt"
+  [ "$name" = "through a symlinked directory" ] && msg="outside the repository" || msg=""
   out=$(tag "$cmd"); rc=$?
-  [ $rc -ne 0 ] && [ -z "$out" ] && grep -q '::error::' "$T/err" && ok "refused: $name" || bad "not refused: $name rc=$rc out='$out'"
+  [ $rc -ne 0 ] && [ -z "$out" ] && grep -q "::error::.*$msg" "$T/err" && ok "refused: $name" || bad "not refused: $name rc=$rc out='$out' $(cat "$T/err")"
 done
 (cd "$T/r" && CONTENT_INPUTS_CMD='echo a.txt' DOCKERFILE=Dockerfile BUILDKIT_IMAGE= "$A/content-tag/content-tag.sh" >/dev/null 2>&1) \
   && bad "empty BuildKit image accepted" || ok "refused: empty BuildKit image"
@@ -43,7 +45,7 @@ mkdir -p "$T/bin"; cat > "$T/bin/docker" <<'STUB'
 #!/usr/bin/env bash
 case "$STUB" in
   found) printf '{"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"digest":"%s"}}' "$D1" ;;
-  index) printf '{"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[]}' ;;
+  index) printf '{"mediaType":"application/vnd.oci.image.index.v1+json","config":{"digest":"%s"}}' "$D1" ;;
   noconfig) printf '{"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{}}' ;;
   notfound) echo "ERROR: ghcr.io/o/i:t: not found" >&2; exit 1 ;;
   denied) echo "ERROR: unexpected status 403 Forbidden" >&2; exit 1 ;;
@@ -66,6 +68,19 @@ dig() { METADATA=$1 "$A/content-image-build/config-digest.sh" 2>/dev/null; }
 [ "$(dig "{\"containerimage.config.digest\":\"$D1\"}")" = "$D1" ] && ok "build metadata digest" || bad "build metadata digest"
 dig '{}' >/dev/null && bad "missing digest accepted" || ok "refused: no digest in the build metadata"
 dig '{"containerimage.config.digest":"sha256:abc"}' >/dev/null && bad "short digest accepted" || ok "refused: malformed digest"
+
+python3 -I - "$A" > "$T/recipe" 2>&1 <<'PY' && ok "build and push use one recipe; shared script exists" || bad "recipe: $(cat "$T/recipe")"
+import os, sys, yaml
+a = sys.argv[1]
+def step(action, sid):
+    return next(s for s in yaml.safe_load(open(f"{a}/{action}/action.yaml"))["runs"]["steps"] if s.get("id") == sid)
+b, p = step("content-image-build", "build"), step("content-image-publish", "push")
+assert b["env"] == p["env"], (b["env"], p["env"])
+bw, pw = dict(b["with"]), dict(p["with"])
+assert bw.pop("outputs").replace("push=false", "push=true") == pw.pop("outputs")
+assert bw == pw, (bw, pw)
+assert os.path.isfile(f"{a}/content-image-build/config-digest.sh")
+PY
 
 echo; echo "RESULT: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

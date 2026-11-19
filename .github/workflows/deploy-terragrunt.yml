@@ -39,8 +39,10 @@ jobs:
           git-ref: ${{ inputs.version }}
 
       - name: "Create a summary"
+        env:
+          VERSION: ${{ steps.fetch-version.outputs.version }}
         run: |
-          echo "Deploying the version ${{steps.fetch-version.outputs.version}}" > $GITHUB_STEP_SUMMARY
+          printf 'Deploying the version %s\n' "$VERSION" > "$GITHUB_STEP_SUMMARY"
 
       - name: Setup profile
         id: setup

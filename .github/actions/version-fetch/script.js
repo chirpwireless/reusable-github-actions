@@ -1,7 +1,7 @@
 const MAIN_BUILD_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7}$/;
 const CONTENT_TAG = /^c-[0-9a-f]{16}$/;
-// The value ends up in the job environment and in image tags: the character set of a Docker tag, one line.
-const VERSION_VALUE = /^[A-Za-z0-9._-]{1,128}$/;
+// The value ends up in the job environment and in image tags: a Docker tag, one line.
+const VERSION_VALUE = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/;
 const EXTRA_LINE = /^(VERSION_[A-Z0-9_]+)=([a-z0-9:_-]+)$/;
 
 async function fetchRelease({github, context, core}) {
@@ -122,8 +122,8 @@ exports.extraValue = (runs, {checkName, production}) => {
     if (!VERSION_VALUE.test(value)) {
         throw new Error(`the \`${checkName}\` check carries an invalid version`);
     }
-    if (production && !CONTENT_TAG.test(value) && !MAIN_BUILD_VERSION.test(value)) {
-        throw new Error(`the \`${checkName}\` check carries ${value}, which is not a main build version`);
+    if (production && !CONTENT_TAG.test(value)) {
+        throw new Error(`the \`${checkName}\` check carries ${value}, which is not a content tag`);
     }
     return value;
 };

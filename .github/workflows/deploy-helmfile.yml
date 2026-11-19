@@ -18,7 +18,7 @@ on:
         description: "Path to the helm charts"
         type: string
       extra_versions:
-        description: "Additional versions, one VERSION_NAME=check-name per line; each is exported to the helmfile step"
+        description: "Additional versions, one VERSION_NAME=check-name per line, exported to the helmfile step. A commit without the check gets no variable: read it with requiredEnv"
         type: string
         default: ""
 
@@ -80,7 +80,7 @@ jobs:
           EXTRA_ENV: ${{ needs.fetch_version.outputs.extra_env }}
         run: |
           [ -n "$EXTRA_ENV" ] || exit 0
-          if printf '%s\n' "$EXTRA_ENV" | LC_ALL=C grep -Evxq 'VERSION_[A-Z0-9_]+=[A-Za-z0-9._-]{1,128}'; then
+          if LC_ALL=C grep -Evxq 'VERSION_[A-Z0-9_]+=[A-Za-z0-9_][A-Za-z0-9._-]{0,127}' <<< "$EXTRA_ENV"; then
             echo "::error::an additional version is not a VERSION_NAME=tag line"
             exit 1
           fi

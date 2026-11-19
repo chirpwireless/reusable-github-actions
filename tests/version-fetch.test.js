@@ -45,15 +45,14 @@ test('extraValue: a check from another app is refused', () => {
     assert.throws(() => vf.extraValue([run('c-0123456789abcdef'), run('c-0123456789abcdef', 'someone')], {checkName: 'c'}),
         /not created by GitHub Actions/);
 });
-for (const v of ['a\nGITHUB_PATH=/tmp', 'a\rb', 'x=y', '$(id)', ' a', 'a ', 'é', '', 'a'.repeat(129)]) {
+for (const v of ['a\nGITHUB_PATH=/tmp', 'a\rb', 'x=y', '$(id)', ' a', '.a', '-a', 'a ', 'é', '', 'a'.repeat(129)]) {
     test(`extraValue refuses the value ${JSON.stringify(v)}`, () => {
         assert.throws(() => vf.extraValue([run(v)], {checkName: 'c', production: false}));
     });
 }
-test('extraValue: on production only main build versions and content tags pass', () => {
-    assert.strictEqual(vf.extraValue([run('2026.1119.10949-42fe263')], {checkName: 'c', production: true}), '2026.1119.10949-42fe263');
-    assert.throws(() => vf.extraValue([run('latest')], {checkName: 'c', production: true}), /not a main build version/);
-    assert.throws(() => vf.extraValue([run('2026.1119.1-42fe263-feature-x')], {checkName: 'c', production: true}));
+test('extraValue: on production only content tags pass', () => {
+    assert.throws(() => vf.extraValue([run('2026.1119.10949-42fe263')], {checkName: 'c', production: true}), /not a content tag/);
+    assert.throws(() => vf.extraValue([run('latest')], {checkName: 'c', production: true}), /not a content tag/);
     assert.strictEqual(vf.extraValue([run('latest')], {checkName: 'c', production: false}), 'latest');
 });
 

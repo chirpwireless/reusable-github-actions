@@ -77,7 +77,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Check the inputs
+      - name: Check the inputs and keep the Docker config out of the workspace
         shell: bash
         env:
           TAG_MODE: ${{ inputs.tag_mode }}
