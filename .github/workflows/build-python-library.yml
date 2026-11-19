@@ -24,17 +24,22 @@ on:
 
 env:
   HOME: ${{github.workspace}}
-  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
 jobs:
   build:
-    runs-on:
-      group: builder
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"builder"}') }}
+    permissions:
+      contents: read
+      packages: read
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -71,8 +76,8 @@ jobs:
           path: dist/
 
   publish-version:
-    runs-on:
-      group: builder
+    if: contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name)
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"builder"}') }}
     needs: [build]
     permissions:
       checks: write

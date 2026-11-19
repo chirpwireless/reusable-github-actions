@@ -32,8 +32,10 @@ env:
 
 jobs:
   build:
-    runs-on:
-      group: builder
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"builder"}') }}
+    permissions:
+      contents: read
+      packages: read
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
     env:
@@ -68,23 +70,19 @@ jobs:
         uses: GoTestTools/gotestfmt-action@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/create-github-app-token@v1
-        id: app-token-chirp-wireless
-        with:
-          app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
-          private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
-          owner: "chirpwireless"
-      - uses: actions/create-github-app-token@v1
-        id: app-token-chirp-depin
-        with:
-          app-id: ${{ secrets.CHIRP_DEPIN_BUILDER_APP_ID }}
-          private-key: ${{ secrets.CHIRP_DEPIN_BUILDER_PRIVATE_KEY }}
-          owner: "chirpdepin"
-      - name: Configure Git to use installation token
+      - name: Configure Git to use a read-only token
+        if: ${{ !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
+        env:
+          TOKEN_CHIRPWIRELESS: ${{ secrets.GO_MODULES_READ_TOKEN }}
+          TOKEN_CHIRPDEPIN: ${{ secrets.GO_MODULES_READ_TOKEN_DEPIN }}
         run: |
-          git config --global url."https://x-access-token:${{ steps.app-token-chirp-wireless.outputs.token }}@github.com/chirpwireless/".insteadOf "https://github.com/chirpwireless/"
-          git config --global url."https://x-access-token:${{ steps.app-token-chirp-depin.outputs.token }}@github.com/chirpdepin/".insteadOf "https://github.com/chirpdepin/"
-          printf "${{ secrets.GITLAB_NETRC }}" > ~/.netrc
+          git config --global url."https://x-access-token:${TOKEN_CHIRPWIRELESS}@github.com/chirpwireless/".insteadOf "https://github.com/chirpwireless/"
+          git config --global url."https://x-access-token:${TOKEN_CHIRPDEPIN}@github.com/chirpdepin/".insteadOf "https://github.com/chirpdepin/"
+      - name: Configure GitLab netrc
+        if: ${{ !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
+        env:
+          GITLAB_NETRC: ${{ secrets.GITLAB_NETRC }}
+        run: printf '%b' "$GITLAB_NETRC" > ~/.netrc
       - name: Generate swagger docs
         if: ${{ inputs.generate_docs == true }}
         env:
@@ -113,6 +111,101 @@ jobs:
           version: ${{ inputs.golangci_lint_version }}
           working-directory: ${{ inputs.app_dir }}
           args: --timeout=10m
+      - name: Remove credentials
+        if: always()
+        run: rm -f ~/.gitconfig ~/.netrc
+      - name: Keep Docker credentials out of the build context
+        run: echo "DOCKER_CONFIG=${RUNNER_TEMP}/docker-config" >> "$GITHUB_ENV"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: ${{ env.docker_tag }}:${{ steps.version.outputs.new_version }}
+          cache-from: type=registry,ref=${{ env.docker_tag }}:buildcache
+
+  # Separate job so that a pull request never gets the write token or the App keys: the job is not created for it.
+  publish:
+    if: contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]')
+    runs-on:
+      group: builder
+    needs: [build]
+    permissions:
+      contents: read
+      packages: write
+      checks: write
+    env:
+      docker_tag: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}
+      GOPATH: /tmp/go
+      GOMODCACHE: /tmp/go/pkg/mod
+      GOPRIVATE: ${{ vars.GOPRIVATE }}
+      GONOSUMDB: ${{ vars.GONOSUMDB }}
+      GOPROXY: ${{ vars.GOPROXY }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "${{ inputs.app_dir }}/go.mod"
+          cache: false
+      - name: Verify Go installation
+        run: |
+          # Remove any stale go binary from GOPATH/bin that shadows the real one
+          GOPATH_BIN="$(go env GOPATH)/bin"
+          rm -f "$GOPATH_BIN/go" "$GOPATH_BIN/gofmt" 2>/dev/null || true
+          go version
+      - uses: actions/create-github-app-token@v1
+        id: app-token-chirp-wireless
+        with:
+          app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
+          private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
+          owner: "chirpwireless"
+          permission-contents: read
+      - uses: actions/create-github-app-token@v1
+        id: app-token-chirp-depin
+        with:
+          app-id: ${{ secrets.CHIRP_DEPIN_BUILDER_APP_ID }}
+          private-key: ${{ secrets.CHIRP_DEPIN_BUILDER_PRIVATE_KEY }}
+          owner: "chirpdepin"
+          permission-contents: read
+      - name: Configure Git to use installation token
+        env:
+          TOKEN_CHIRPWIRELESS: ${{ steps.app-token-chirp-wireless.outputs.token }}
+          TOKEN_CHIRPDEPIN: ${{ steps.app-token-chirp-depin.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN_CHIRPWIRELESS}@github.com/chirpwireless/".insteadOf "https://github.com/chirpwireless/"
+          git config --global url."https://x-access-token:${TOKEN_CHIRPDEPIN}@github.com/chirpdepin/".insteadOf "https://github.com/chirpdepin/"
+      - name: Configure GitLab netrc
+        env:
+          GITLAB_NETRC: ${{ secrets.GITLAB_NETRC }}
+        run: printf '%b' "$GITLAB_NETRC" > ~/.netrc
+      - name: Generate swagger docs
+        if: ${{ inputs.generate_docs == true }}
+        env:
+          GOPROXY: https://proxy.golang.org,direct
+        run: |
+          go install github.com/swaggo/swag/cmd/swag@v1.16.4
+          make swagger
+      - name: Install dependencies
+        run: make install
+      - name: Run build
+        run: make build
+      - name: Remove credentials
+        if: always()
+        run: rm -f ~/.gitconfig ~/.netrc
+      - name: Keep Docker credentials out of the build context
+        run: echo "DOCKER_CONFIG=${RUNNER_TEMP}/docker-config" >> "$GITHUB_ENV"
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
@@ -126,20 +219,22 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.docker_tag }}:${{ steps.version.outputs.new_version }}
+          tags: ${{ env.docker_tag }}:${{ needs.build.outputs.new_version }}
           cache-from: type=registry,ref=${{ env.docker_tag }}:buildcache
           cache-to: type=registry,ref=${{ env.docker_tag }}:buildcache,mode=max
       - name: Publish Version
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}
-          build-version: ${{ steps.version.outputs.new_version }}
+          build-version: ${{ needs.build.outputs.new_version }}
 
   publish-release:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
       group: hetzner-k3s-dev
-    needs: [build]
+    needs: [build, publish]
+    permissions:
+      contents: write
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
         with:

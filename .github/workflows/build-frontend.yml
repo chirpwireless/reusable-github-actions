@@ -13,16 +13,18 @@ on:
 
 env:
   HOME: ${{github.workspace}}
-  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
 jobs:
   generate-version:
-    runs-on:
-      group: builder
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"builder"}') }}
+    permissions:
+      contents: read
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - id: version
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
       - name: "Create a summary"
@@ -30,12 +32,18 @@ jobs:
           echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
 
   build:
-    runs-on:
-      group: builder
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"builder"}') }}
     needs: [generate-version]
+    permissions:
+      contents: read
+      packages: read
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Setup NodeJS
         uses: actions/setup-node@v4
         with:
@@ -51,6 +59,56 @@ jobs:
         run: yarn build
       - name: Install yarn production dependencies
         run: yarn install --production --frozen-lockfile
+      - name: Keep Docker credentials out of the build context
+        run: echo "DOCKER_CONFIG=${RUNNER_TEMP}/docker-config" >> "$GITHUB_ENV"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
+
+  # Separate job so that a pull request never gets the write token: the job is not created for it.
+  publish:
+    if: contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name) && !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]')
+    runs-on:
+      group: builder
+    needs: [generate-version, build]
+    permissions:
+      contents: read
+      packages: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup NodeJS
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+      # Install yarn as we are using a self-hosted runner
+      - name: Setup Yarn
+        shell: bash
+        run: |
+          npm install -g yarn@1.22.22
+      - name: Install yarn dependencies
+        run: yarn install --frozen-lockfile
+      - name: Run build
+        run: yarn build
+      - name: Install yarn production dependencies
+        run: yarn install --production --frozen-lockfile
+      - name: Keep Docker credentials out of the build context
+        run: echo "DOCKER_CONFIG=${RUNNER_TEMP}/docker-config" >> "$GITHUB_ENV"
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
@@ -67,9 +125,9 @@ jobs:
           tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service_name }}:${{ needs.generate-version.outputs.service-version }}
 
   publish-version:
-    runs-on:
-      group: hetzner-k3s-dev
-    needs: [generate-version, build]
+    if: contains(fromJSON('["push","workflow_dispatch","schedule"]'), github.event_name)
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"hetzner-k3s-dev"}') }}
+    needs: [generate-version, build, publish]
     permissions:
       checks: write
     steps:
@@ -83,7 +141,9 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on:
       group: hetzner-k3s-dev
-    needs: [generate-version, build]
+    needs: [generate-version, build, publish]
+    permissions:
+      contents: write
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
         with:

@@ -11,35 +11,34 @@ env:
 
 jobs:
   build:
-    runs-on:
-      group: builder
+    runs-on: ${{ (github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') && 'ubuntu-latest' || fromJSON('{"group":"builder"}') }}
+    permissions:
+      contents: read
     outputs:
       service-version: ${{ steps.version.outputs.new_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
           cache-dependency-path: "go.sum"
-      - uses: actions/create-github-app-token@v1
-        id: app-token-chirp-wireless
-        with:
-          app-id: ${{ secrets.GOLANG_BUILDER_APP_ID }}
-          private-key: ${{ secrets.GOLANG_BUILDER_PRIVATE_KEY }}
-          owner: "chirpwireless"
-      - uses: actions/create-github-app-token@v1
-        id: app-token-chirp-depin
-        with:
-          app-id: ${{ secrets.CHIRP_DEPIN_BUILDER_APP_ID }}
-          private-key: ${{ secrets.CHIRP_DEPIN_BUILDER_PRIVATE_KEY }}
-          owner: "chirpdepin"
-      - name: Configure Git to use installation token
+      - name: Configure Git to use a read-only token
+        if: ${{ !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
+        env:
+          TOKEN_CHIRPWIRELESS: ${{ secrets.GO_MODULES_READ_TOKEN }}
+          TOKEN_CHIRPDEPIN: ${{ secrets.GO_MODULES_READ_TOKEN_DEPIN }}
         run: |
-          git config --global url."https://x-access-token:${{ steps.app-token-chirp-wireless.outputs.token }}@github.com/chirpwireless/".insteadOf "https://github.com/chirpwireless/"
-          git config --global url."https://x-access-token:${{ steps.app-token-chirp-depin.outputs.token }}@github.com/chirpdepin/".insteadOf "https://github.com/chirpdepin/"
-          printf "${{ secrets.GITLAB_NETRC }}" > "${HOME}/.netrc"
+          git config --global url."https://x-access-token:${TOKEN_CHIRPWIRELESS}@github.com/chirpwireless/".insteadOf "https://github.com/chirpwireless/"
+          git config --global url."https://x-access-token:${TOKEN_CHIRPDEPIN}@github.com/chirpdepin/".insteadOf "https://github.com/chirpdepin/"
+      - name: Configure GitLab netrc
+        if: ${{ !(github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
+        env:
+          GITLAB_NETRC: ${{ secrets.GITLAB_NETRC }}
+        run: printf '%b' "$GITLAB_NETRC" > "${HOME}/.netrc"
       - name: Install dependencies
         run: make install
       - name: Run build
@@ -51,6 +50,9 @@ jobs:
         with:
           version: v1.62.2
           args: --timeout=10m
+      - name: Remove credentials
+        if: always()
+        run: rm -f "${HOME}/.gitconfig" "${HOME}/.netrc"
       - name: Generate Version
         id: version
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
@@ -60,6 +62,8 @@ jobs:
     runs-on:
       group: builder
     needs: [build]
+    permissions:
+      contents: write
     steps:
       - uses: chirpwireless/reusable-github-actions/.github/actions/publish-release@main
         with:
