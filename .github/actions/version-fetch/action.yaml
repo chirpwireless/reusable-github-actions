@@ -10,6 +10,14 @@ inputs:
     description: 'The name of the check containing the build version'
     required: false
     default: 'chirp:version'
+  extra-versions:
+    description: 'Additional versions, one VERSION_NAME=check-name per line, each read from the check-run of the same ref'
+    required: false
+    default: ''
+  production:
+    description: 'true for a production deploy: an additional version must then be a main build version or a content tag'
+    required: false
+    default: 'false'
   github-token:
     description: 'The GitHub token'
     required: true
@@ -19,10 +27,22 @@ outputs:
   version:
     description: 'Build version fetched from git ref'
     value: ${{ steps.fetch-version.outputs.result }}
+  extra-env:
+    description: 'NAME=value lines for the additional versions; empty without extra-versions'
+    value: ${{ steps.fetch-extra.outputs.result }}
 
 runs:
   using: 'composite'
   steps:
+    - id: check-extra
+      if: ${{ inputs.extra-versions != '' }}
+      uses: actions/github-script@v7
+      env:
+        EXTRA_VERSIONS: ${{ inputs.extra-versions }}
+      with:
+        script: |
+          const { parseExtraVersions } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
+          parseExtraVersions(process.env.EXTRA_VERSIONS)
     - id: fetch-ref
       uses: actions/github-script@v7
       env:
@@ -44,6 +64,21 @@ runs:
         script: |
           const { fetchVersion } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
           return fetchVersion({ github, context, core });
+    - id: fetch-extra
+      if: ${{ inputs.extra-versions != '' }}
+      uses: actions/github-script@v7
+      env:
+        GIT_REF: ${{ steps.fetch-ref.outputs.result }}
+        EXTRA_VERSIONS: ${{ inputs.extra-versions }}
+        PRODUCTION: ${{ inputs.production }}
+      with:
+        result-encoding: string
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const { fetchExtra } = require(`${process.env.GITHUB_ACTION_PATH}/script.js`)
+          return fetchExtra({ github, context, core });
     - id: log-output
       shell: bash
-      run: echo ${{ steps.fetch-version.outputs.result }}
+      env:
+        VERSION: ${{ steps.fetch-version.outputs.result }}
+      run: printf '%s\n' "$VERSION"
