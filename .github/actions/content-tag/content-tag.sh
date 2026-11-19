@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Prints the content tag of an image: c- and 16 hex of the SHA-256 over the sorted "<path>\t<sha256>" list of its inputs.
+# Prints the content tag of an image: c- and 16 hex of the SHA-256 over the sorted "<path>\t<sha256>" list of its inputs,
+# plus the BuildKit image and the build settings.
 # Env: CONTENT_INPUTS_CMD (prints input paths from the repository root), DOCKERFILE, BUILDKIT_IMAGE.
 set -euo pipefail
 # Settings of content-image-build and content-image-publish that change image bytes; edit together with them.

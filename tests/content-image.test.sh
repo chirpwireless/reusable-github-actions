@@ -80,6 +80,13 @@ bw, pw = dict(b["with"]), dict(p["with"])
 assert bw.pop("outputs").replace("push=false", "push=true") == pw.pop("outputs")
 assert bw == pw, (bw, pw)
 assert os.path.isfile(f"{a}/content-image-build/config-digest.sh")
+w = b["with"]
+assert w["outputs"].endswith(",push=false,rewrite-timestamp=true"), w["outputs"]
+tokens = [f"platforms={w['platforms']}"] + [f"{k}={v}" for k, v in b["env"].items()] + ["rewrite-timestamp"]
+tokens += ["no-cache"] if w["no-cache"] is True else []
+tokens += [f"no-{k}" for k in ("provenance", "sbom") if w[k] is False]
+recipe = next(l for l in open(f"{a}/content-tag/content-tag.sh") if l.startswith("RECIPE="))
+assert recipe.strip() == "RECIPE='" + " ".join(tokens) + "'", (recipe, tokens)
 PY
 
 echo; echo "RESULT: $pass passed, $fail failed"
