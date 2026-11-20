@@ -69,7 +69,10 @@ jobs:
             echo "::error::image $VERSION is not a $base build: production deploys only images built from $base"
             exit 1
           fi
-      - uses: azure/setup-helm@v4.2.0
+      # Helm comes from the pinned runner image: deploy runners do not download tools.
+      - name: Helm from the runner image
+        shell: sh
+        run: helm version --short
       - name: Helm upgrade
         shell: sh
         run: |
