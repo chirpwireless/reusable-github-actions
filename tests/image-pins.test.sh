@@ -162,6 +162,7 @@ check_of "image: \"ghcr.io/chirpwireless/svc:1.2.3-ccccccc@$D1\"
 image: ghcr.io/chirpwireless/brewctl:0.6.0@$D2
 image: liquibase/liquibase:4.28.0-alpine" && ok "check: pinned, pinned in values and foreign pass" || { bad "check good"; cat "$T/rerr"; }
 refused "check: a render without any image of the owner" "$T/rerr" "no image of ghcr.io/chirpwireless/ in the render" check_of 'image: liquibase/liquibase:4.28.0-alpine'
+refused "check: upper case" "$T/rerr" "GHCR.IO/chirpwireless/migrations:1 is not an image pinned" check_of 'image: GHCR.IO/chirpwireless/migrations:1'
 refused "check: hook by tag" "$T/rerr" "ghcr.io/chirpwireless/migrations:1 is not an image pinned" check_of 'image: ghcr.io/chirpwireless/migrations:1'
 refused "check: another digest for a recorded tag" "$T/rerr" "is not the trusted digest of ghcr.io/chirpwireless/svc:1.2.3-ccccccc" check_of "image: ghcr.io/chirpwireless/svc:1.2.3-ccccccc@$D2"
 
@@ -199,10 +200,10 @@ steps = yaml.safe_load(open(".github/workflows/deploy-helmfile.yml"))["jobs"]["d
 print(next(s["run"] for s in steps if s.get("name") == "Deploy using helmfile"), end="")
 ' | sed 's/\${{ *inputs\.deploy_dir *}}/./; s/\${{ *inputs\.namespace || inputs\.environment *}}/ns1/g; s/\${{ *inputs\.environment *}}/dev/g' > "$T/deploystep.sh"
 mkdir -p "$T/hfbin"
-printf '#!/bin/sh\necho "helmfile $*" >> "$CALLS"\n[ "$5" = template ] && echo "image: x"\nexit 0\n' > "$T/hfbin/helmfile"
-printf '#!/bin/sh\necho "renderer $*" >> "$CALLS"\nin=$(cat)\n[ "$1" = --check ] || { printf "%%s\\n" "$in"; exit 0; }\n[ "$in" = "image: x" ] || { echo "check got no template output" >&2; exit 1; }\n[ -z "$CHECK_FAILS" ]\n' > "$T/hfbin/renderer"
+printf '#!/bin/sh\necho "helmfile $*" >> "$CALLS"\n[ "$5" = template ] && echo "image: $RENDER_ID"\nexit 0\n' > "$T/hfbin/helmfile"
+printf '#!/bin/sh\necho "renderer $*" >> "$CALLS"\nin=$(cat)\n[ "$1" = --check ] || { printf "%%s\\n" "$in"; exit 0; }\n[ "$in" = "image: $RENDER_ID" ] || { echo "check got no template output" >&2; exit 1; }\n[ -z "$CHECK_FAILS" ]\n' > "$T/hfbin/renderer"
 chmod +x "$T/hfbin/helmfile" "$T/hfbin/renderer"
-deploy_step() { : > "$T/calls"; (cd "$T" && PATH=$T/hfbin:$PATH CALLS=$T/calls RUNNER_TEMP=$T bash -e "$T/deploystep.sh") > "$T/dlog" 2>&1; }
+deploy_step() { : > "$T/calls"; (cd "$T" && PATH=$T/hfbin:$PATH CALLS=$T/calls RUNNER_TEMP=$T RENDER_ID=render-$RANDOM$RANDOM bash -e "$T/deploystep.sh") > "$T/dlog" 2>&1; }
 PIN_IMAGES=true IMAGE_PINS_RENDERER=$T/hfbin/renderer deploy_step \
   && [ "$(sed 's/ -e dev -n ns1 / /' "$T/calls" | tr '\n' '|')" = "helmfile template --post-renderer $T/hfbin/renderer|renderer --check|helmfile apply --post-renderer $T/hfbin/renderer|" ] \
   && ok "deploy step: template, check, then apply with the renderer" || { bad "deploy step pinned"; cat "$T/calls" "$T/dlog"; }

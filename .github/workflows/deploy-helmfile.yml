@@ -22,7 +22,7 @@ on:
         type: string
         default: ""
       pin_images:
-        description: "Deploy every ghcr.io/<owner> image by the digest a push build of the commit recorded; the caller grants actions: read. IMAGE_PINS_FILE lists image:tag@digest for helmfile hooks"
+        description: "Deploy every ghcr.io/<owner> image by the digest a push build of the commit recorded; the caller grants actions: read. IMAGE_PINS_FILE lists image:tag@digest for helmfile hooks. A render without any ghcr.io/<owner> image fails"
         type: boolean
         default: false
 
