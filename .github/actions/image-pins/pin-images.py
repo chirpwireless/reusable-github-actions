@@ -1,5 +1,7 @@
 #!/usr/bin/python3 -I
-"""Helm post-renderer: every ghcr.io/<owner> image by tag becomes tag@digest of the trusted build; anything else of the owner fails."""
+"""Helm post-renderer: every ghcr.io/<owner> image by tag becomes tag@digest of the trusted build; anything else of the owner fails.
+
+Helm 3 does not pass hooks to a post-renderer, so --check reads the whole helmfile template output and fails on any unpinned image."""
 import os
 import re
 import sys
@@ -50,6 +52,19 @@ def render(text, prefix, pins, pinned_re):
     return result
 
 
+def check(text, prefix, pins, pinned_re):
+    errors = []
+    for token in re.findall(r"[^\s\"'\[\]{},=]*" + re.escape(prefix) + r"[^\s\"'\[\]{},]*", text, flags=re.IGNORECASE):
+        if not pinned_re.match(token):
+            errors.append(f"{token} is not an image pinned by digest")
+            continue
+        ref, digest = token.split("@", 1)
+        if pins.get(ref, digest) != digest:
+            errors.append(f"{token} is not the trusted digest of {ref}")
+    if errors:
+        raise ValueError("; ".join(sorted(set(errors))))
+
+
 def main():
     owner = os.environ.get("IMAGE_PINS_OWNER", "")
     path = os.environ.get("IMAGE_PINS_FILE", "")
@@ -59,7 +74,10 @@ def main():
     prefix = f"ghcr.io/{owner}/"
     try:
         pins, pinned_re = load_pins(path, prefix)
-        sys.stdout.write(render(sys.stdin.read(), prefix, pins, pinned_re))
+        if sys.argv[1:] == ["--check"]:
+            check(sys.stdin.read(), prefix, pins, pinned_re)
+        else:
+            sys.stdout.write(render(sys.stdin.read(), prefix, pins, pinned_re))
     except ValueError as e:
         print(f"pin-images: {e}", file=sys.stderr)
         return 1

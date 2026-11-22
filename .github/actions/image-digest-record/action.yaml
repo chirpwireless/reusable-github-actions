@@ -28,3 +28,4 @@ runs:
         path: ${{ steps.record.outputs.path }}
         if-no-files-found: error
         retention-days: 90
+        overwrite: true
