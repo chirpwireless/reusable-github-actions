@@ -194,8 +194,8 @@ jobs:
           file: ${{ inputs.dockerfile }}
           push: true
           tags: ${{ env.docker_tag }}:${{ steps.version.outputs.new_version }}
-          cache-from: ${{ github.event_name == 'pull_request' && format('type=registry,ref={0}:buildcache', env.docker_tag) || format('type=gha,scope={0}', env.docker_tag) }}
-          cache-to: ${{ github.event_name == 'pull_request' && format('type=registry,ref={0}:buildcache,mode=max', env.docker_tag) || format('type=gha,scope={0},mode=max', env.docker_tag) }}
+          cache-from: ${{ github.event_name == 'pull_request' && format('type=registry,ref={0}:buildcache', env.docker_tag) || '' }}
+          cache-to: ${{ github.event_name == 'pull_request' && format('type=registry,ref={0}:buildcache,mode=max', env.docker_tag) || '' }}
       - name: Record the image digest
         if: ${{ inputs.tag_mode == 'calendar' }}
         uses: chirpwireless/reusable-github-actions/.github/actions/image-digest-record@main

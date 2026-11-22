@@ -13,8 +13,8 @@ SHA=$(gh api "repos/$REPO/commits/$ref" --jq .sha) || die "cannot resolve '$GIT_
 
 if [ "${PRODUCTION:-false}" = true ]; then
   heads=$(gh api "repos/$REPO/git/matching-refs/heads/ma" --jq '.[].ref') || die "cannot list the branches of $REPO"
-  if grep -qx refs/heads/main <<< "$heads"; then branch=main
-  elif grep -qx refs/heads/master <<< "$heads"; then branch=master
+  if grep -qxF refs/heads/main <<< "$heads"; then branch=main
+  elif grep -qxF refs/heads/master <<< "$heads"; then branch=master
   else die "$REPO has neither main nor master"; fi
 else
   branch=$(gh api "repos/$REPO" --jq .default_branch) || die "cannot read the default branch of $REPO"
@@ -22,12 +22,18 @@ fi
 [[ $branch =~ ^[A-Za-z0-9._/-]+$ ]] || die "unexpected branch name '$branch'"
 # A run of a tag push reports the tag name as its branch.
 tags=$(gh api "repos/$REPO/git/matching-refs/tags/$branch" --jq '.[].ref') || die "cannot list the tags of $REPO"
-! grep -qx "refs/tags/$branch" <<< "$tags" || die "a tag named $branch exists: runs of $branch cannot be told from runs of the tag"
+! grep -qxF "refs/tags/$branch" <<< "$tags" || die "a tag named $branch exists: runs of $branch cannot be told from runs of the tag"
 status=$(gh api "repos/$REPO/compare/$(jq -rn --arg b "$branch" '$b|@uri')...$SHA" --jq .status) || die "cannot compare $SHA with $branch"
 case $status in
   identical|behind) ;;
   *) die "$SHA is not on $branch ($status): image digests are trusted only from commits on $branch" ;;
 esac
+
+# A run of a tag that was deleted also reports the branch: the commit must have been the head of a push or merge to the branch itself.
+pushed=$(SHA=$SHA BRANCH=$branch gh api "repos/$REPO/activity?ref=$(jq -rn --arg b "refs/heads/$branch" '$b|@uri')&time_period=quarter&per_page=100" --paginate \
+  --jq '.[] | select(.ref == "refs/heads/" + env.BRANCH and .after == env.SHA and (.activity_type == "push" or .activity_type == "force_push" or .activity_type == "pr_merge" or .activity_type == "merge_queue_merge")) | .after') \
+  || die "cannot read the push activity of $branch"
+[ -n "$pushed" ] || die "$SHA was not the head of a push or merge to $branch in the last 90 days"
 
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 # Only runs of the trusted branch itself: an intermediate commit of a merged branch is on it, but its push run executed that branch's files.

@@ -111,10 +111,13 @@ jobs:
       - name: Deploy using helmfile
         env:
           VERSION: ${{ needs.fetch_version.outputs.version }}
+          PIN_IMAGES: ${{ inputs.pin_images }}
         run: |
           cd ${{ inputs.deploy_dir }}
-          if [ -n "${IMAGE_PINS_RENDERER:-}" ]; then
-            helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} template --post-renderer "$IMAGE_PINS_RENDERER" > "$RUNNER_TEMP/pinned-render.yaml"
+          if [ "$PIN_IMAGES" = true ]; then
+            helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} template --post-renderer "${IMAGE_PINS_RENDERER:?}" > "$RUNNER_TEMP/pinned-render.yaml"
             "$IMAGE_PINS_RENDERER" --check < "$RUNNER_TEMP/pinned-render.yaml"
+            helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} apply --post-renderer "$IMAGE_PINS_RENDERER"
+          else
+            helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} apply
           fi
-          helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} apply ${IMAGE_PINS_RENDERER:+--post-renderer "$IMAGE_PINS_RENDERER"}

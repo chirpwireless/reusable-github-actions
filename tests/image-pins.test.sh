@@ -35,6 +35,7 @@ case "$1 $2" in
   "api repos/chirpwireless/svc/git/matching-refs/heads/ma") printf '%s\n' $STUB_HEADS | jq -R '{ref: .}' | jq -s . | jq -r "$(jqf "$@")" ;;
   "api repos/chirpwireless/svc/git/matching-refs/tags/"*) printf '%s\n' $STUB_TAGS | jq -R 'select(. != "") | {ref: .}' | jq -s . | jq -r "$(jqf "$@")" ;;
   "api repos/chirpwireless/svc") echo develop ;;
+  "api repos/chirpwireless/svc/activity?"*) echo "$2" >> "$F/activity-query"; printf '%s\n' "$STUB_ACT" | jq -R 'select(. != "") | split(" ") | {activity_type: .[0], ref: .[1], after: .[2]}' | jq -s . | jq -r "$(jqf "$@")" ;;
   "api repos/chirpwireless/svc/compare/"*) echo "$2" >> "$F/compared"; echo "$STUB_STATUS" ;;
   "api repos/chirpwireless/svc/actions/runs?"*) echo "$2" >> "$F/runs-query"; jq -r "$(jqf "$@")" "$F/runs.json" ;;
   "api repos/chirpwireless/svc/actions/runs/"*) id=${2#repos/chirpwireless/svc/actions/runs/}; id=${id%%/*}; jq -r "$(jqf "$@")" "$F/artifacts-$id.json" ;;
@@ -58,7 +59,9 @@ artifacts() { # id name...
 }
 pin() { mkdir -p "$S/dl-$1/$2"; printf '%s\n' "$3" > "$S/dl-$1/$2/pin.txt"; }
 lookup() { rm -f "$S/compared" "$S/runs-query"; : > "$T/gout"
+  local b=main; [ "${PRODUCTION:-true}" = true ] || b=develop; [ "${STUB_HEADS:-}" != refs/heads/master ] || b=master
   PATH=$T/bin:$PATH STUB_DIR=$S STUB_SHA=${STUB_SHA:-$SHA} STUB_STATUS=${STUB_STATUS:-behind} STUB_HEADS=${STUB_HEADS:-refs/heads/main} \
+    STUB_ACT=${STUB_ACT-"pr_merge refs/heads/$b ${STUB_SHA:-$SHA}"} \
     STUB_TAGS=${STUB_TAGS:-} GIT_REF=${GIT_REF:-$SHA} PRODUCTION=${PRODUCTION:-true} \
     GITHUB_OUTPUT=$T/gout bash .github/actions/trusted-image-digests/trusted-digests.sh > "$T/glog" 2>&1; }
 with() { local cmd=${!#} kv; ( for kv in "${@:1:$#-1}"; do export "$kv"; done; "$cmd" ); }
@@ -86,6 +89,10 @@ refused "a tag named main" "$T/glog" "a tag named main exists" with STUB_TAGS=re
 STUB_TAGS=refs/tags/main-1 lookup && ok "lookup: a tag that only starts with main is fine" || bad "tag prefix"
 refused "commit not on main" "$T/glog" "is not on main (ahead)" with STUB_STATUS=ahead lookup
 [ ! -s "$T/gout" ] && ok "refused lookup writes no output" || bad "refused lookup wrote output"
+refused "a commit never pushed or merged to main (a deleted tag)" "$T/glog" "was not the head of a push or merge to main" with STUB_ACT= lookup
+refused "a push of the commit to another branch" "$T/glog" "was not the head of a push or merge to main" with "STUB_ACT=push refs/heads/feature-x $SHA" lookup
+refused "a branch creation is not a push" "$T/glog" "was not the head of a push or merge to main" with "STUB_ACT=branch_creation refs/heads/main $SHA" lookup
+with "STUB_ACT=push refs/heads/main $SHA" lookup && grep -q 'ref=refs%2Fheads%2Fmain' "$S/activity-query" && ok "lookup: a direct push to main counts" || bad "direct push"
 refused "diverged commit" "$T/glog" "is not on main (diverged)" with STUB_STATUS=diverged lookup
 refused "unknown ref" "$T/glog" "cannot resolve" with STUB_NO_REF=1 lookup
 refused "resolved value is not a commit" "$T/glog" "not a commit" with STUB_SHA=abc lookup
@@ -163,8 +170,18 @@ else
   bad "helm is not installed"
 fi
 
+# --- the deploy job checks it checked out the commit whose digests were read
+python3 -c '
+import yaml
+steps = yaml.safe_load(open(".github/workflows/deploy-helmfile.yml"))["jobs"]["deploy"]["steps"]
+print(next(s["run"] for s in steps if s.get("name") == "The checked-out commit is the one whose digests were read"), end="")
+' > "$T/shastep.sh"
+mkdir -p "$T/gitbin"; printf '#!/bin/sh\necho "$FAKE_HEAD"\n' > "$T/gitbin/git"; chmod +x "$T/gitbin/git"
+PATH=$T/gitbin:$PATH FAKE_HEAD=$SHA SHA=$SHA bash -e "$T/shastep.sh" > /dev/null 2>&1 && ok "deploy: the same commit passes" || bad "deploy same commit"
+refused "deploy: another checked-out commit" "$T/slog" "digests are of $SHA" sh -c "PATH=$T/gitbin:\$PATH FAKE_HEAD=$OTHER SHA=$SHA bash -e $T/shastep.sh > $T/slog 2>&1"
+
 # --- wiring
-python3 - <<'EOF' && ok "wiring: pin steps gated by pin_images, check before apply, record right after the push" || bad "wiring"
+python3 - <<'EOF' && ok "wiring: pin steps gated by pin_images, check before apply, record right after the push, no cache outside pull requests" || bad "wiring"
 import yaml
 w = yaml.safe_load(open(".github/workflows/deploy-helmfile.yml"))
 assert w[True]["workflow_call"]["inputs"]["pin_images"]["default"] is False
@@ -173,15 +190,16 @@ assert fetch["digests"]["if"] == "${{ inputs.pin_images }}"
 deploy = {s.get("name"): s for s in w["jobs"]["deploy"]["steps"]}
 assert deploy["Pin images by digest"]["if"] == "${{ inputs.pin_images }}"
 assert deploy["The checked-out commit is the one whose digests were read"]["if"] == "${{ inputs.pin_images }}"
-run = deploy["Deploy using helmfile"]["run"]
-assert run.index('"$IMAGE_PINS_RENDERER" --check') < run.index(" apply ")
-assert '${IMAGE_PINS_RENDERER:+--post-renderer "$IMAGE_PINS_RENDERER"}' in run
+step = deploy["Deploy using helmfile"]
+assert step["env"]["PIN_IMAGES"] == "${{ inputs.pin_images }}"
+run = step["run"]
+assert run.index('"$IMAGE_PINS_RENDERER" --check') < run.index('apply --post-renderer "$IMAGE_PINS_RENDERER"')
 b = yaml.safe_load(open(".github/workflows/build-go.yml"))["jobs"]["build"]["steps"]
 i = next(n for n, s in enumerate(b) if s.get("id") == "push-image")
 assert b[i + 1]["uses"].endswith("/image-digest-record@main") and "steps.push-image.outputs.digest" in b[i + 1]["with"]["digest"]
 cache = b[i]["with"]
-assert "type=gha" in cache["cache-from"] and "github.event_name == 'pull_request'" in cache["cache-from"]
-assert "type=gha" in cache["cache-to"] and "github.event_name == 'pull_request'" in cache["cache-to"]
+for k in ("cache-from", "cache-to"):
+    assert cache[k].startswith("${{ github.event_name == 'pull_request' && format('type=registry,") and cache[k].endswith(") || '' }}"), cache[k]
 EOF
 echo; echo "RESULT: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
