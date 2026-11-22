@@ -32,6 +32,7 @@ F=$STUB_DIR
 jqf() { local i; for ((i=1; i<=$#; i++)); do [ "${!i}" = --jq ] && { j=$((i+1)); echo "${!j}"; return; }; done; }
 case "$1 $2" in
   "api repos/chirpwireless/svc/commits/"*) [ -z "${STUB_NO_REF:-}" ] || exit 1; echo "$STUB_SHA" ;;
+  "api repos/chirpwireless/svc/branches/"*) echo "$2" >> "$F/protection-query"; echo "${STUB_PROTECTED:-true}" ;;
   "api repos/chirpwireless/svc/git/matching-refs/heads/ma") printf '%s\n' $STUB_HEADS | jq -R '{ref: .}' | jq -s . | jq -r "$(jqf "$@")" ;;
   "api repos/chirpwireless/svc/git/matching-refs/tags/"*) printf '%s\n' $STUB_TAGS | jq -R 'select(. != "") | {ref: .}' | jq -s . | jq -r "$(jqf "$@")" ;;
   "api repos/chirpwireless/svc") echo develop ;;
@@ -91,6 +92,10 @@ refused "commit not on main" "$T/glog" "is not on main (ahead)" with STUB_STATUS
 [ ! -s "$T/gout" ] && ok "refused lookup writes no output" || bad "refused lookup wrote output"
 refused "a commit never pushed or merged to main (a deleted tag)" "$T/glog" "was not the head of a push or merge to main" with STUB_ACT= lookup
 refused "a push of the commit to another branch" "$T/glog" "was not the head of a push or merge to main" with "STUB_ACT=push refs/heads/feature-x $SHA" lookup
+refused "the activity of main has other commits only" "$T/glog" "was not the head of a push or merge to main" with "STUB_ACT=pr_merge refs/heads/main $OTHER" lookup
+refused "production on an unprotected branch" "$T/glog" "main is not protected" with STUB_PROTECTED=false lookup
+refused "production on an unprotected master" "$T/glog" "master is not protected" with STUB_HEADS=refs/heads/master STUB_PROTECTED=false lookup
+rm -f "$S/protection-query"; PRODUCTION=false lookup; [ ! -e "$S/protection-query" ] && ok "dev does not require a protected branch" || bad "dev protection"
 refused "a branch creation is not a push" "$T/glog" "was not the head of a push or merge to main" with "STUB_ACT=branch_creation refs/heads/main $SHA" lookup
 with "STUB_ACT=push refs/heads/main $SHA" lookup && grep -q 'ref=refs%2Fheads%2Fmain' "$S/activity-query" && ok "lookup: a direct push to main counts" || bad "direct push"
 refused "diverged commit" "$T/glog" "is not on main (diverged)" with STUB_STATUS=diverged lookup
@@ -179,6 +184,27 @@ print(next(s["run"] for s in steps if s.get("name") == "The checked-out commit i
 mkdir -p "$T/gitbin"; printf '#!/bin/sh\necho "$FAKE_HEAD"\n' > "$T/gitbin/git"; chmod +x "$T/gitbin/git"
 PATH=$T/gitbin:$PATH FAKE_HEAD=$SHA SHA=$SHA bash -e "$T/shastep.sh" > /dev/null 2>&1 && ok "deploy: the same commit passes" || bad "deploy same commit"
 refused "deploy: another checked-out commit" "$T/slog" "digests are of $SHA" sh -c "PATH=$T/gitbin:\$PATH FAKE_HEAD=$OTHER SHA=$SHA bash -e $T/shastep.sh > $T/slog 2>&1"
+
+# --- the deploy step: check before apply on the pinned path, plain apply otherwise
+python3 -c '
+import yaml
+steps = yaml.safe_load(open(".github/workflows/deploy-helmfile.yml"))["jobs"]["deploy"]["steps"]
+print(next(s["run"] for s in steps if s.get("name") == "Deploy using helmfile"), end="")
+' | sed 's/\${{ *inputs\.deploy_dir *}}/./; s/\${{ *inputs\.environment *}}/dev/g; s/\${{ *inputs\.namespace || inputs\.environment *}}/dev/g' > "$T/deploystep.sh"
+mkdir -p "$T/hfbin"
+printf '#!/bin/sh\necho "helmfile $*" >> "$CALLS"\n[ "$5" = template ] && echo "image: x"\nexit 0\n' > "$T/hfbin/helmfile"
+printf '#!/bin/sh\necho "renderer $*" >> "$CALLS"\n[ "$1" = --check ] && [ -n "$CHECK_FAILS" ] && exit 1\ncat\n' > "$T/hfbin/renderer"
+chmod +x "$T/hfbin/helmfile" "$T/hfbin/renderer"
+deploy_step() { : > "$T/calls"; (cd "$T" && PATH=$T/hfbin:$PATH CALLS=$T/calls RUNNER_TEMP=$T bash -e "$T/deploystep.sh") > "$T/dlog" 2>&1; }
+PIN_IMAGES=true IMAGE_PINS_RENDERER=$T/hfbin/renderer deploy_step \
+  && [ "$(sed 's/ -e dev -n dev / /' "$T/calls" | tr '\n' '|')" = "helmfile template --post-renderer $T/hfbin/renderer|renderer --check|helmfile apply --post-renderer $T/hfbin/renderer|" ] \
+  && ok "deploy step: template, check, then apply with the renderer" || { bad "deploy step pinned"; cat "$T/calls" "$T/dlog"; }
+PIN_IMAGES=true IMAGE_PINS_RENDERER=$T/hfbin/renderer CHECK_FAILS=1 deploy_step; rc=$?
+[ $rc -ne 0 ] && ! grep -q 'helmfile.* apply' "$T/calls" && ok "deploy step: a failing check stops before apply" || bad "deploy step check failure"
+PIN_IMAGES=true deploy_step; rc=$?
+[ $rc -ne 0 ] && [ ! -s "$T/calls" ] && ok "deploy step: pinned path without the renderer fails before helmfile" || bad "deploy step no renderer"
+PIN_IMAGES=false IMAGE_PINS_RENDERER=$T/hfbin/renderer deploy_step \
+  && [ "$(sed 's/ -e dev -n dev / /' "$T/calls")" = "helmfile apply" ] && ok "deploy step: without pinning a plain apply" || { bad "deploy step plain"; cat "$T/calls"; }
 
 # --- wiring
 python3 - <<'EOF' && ok "wiring: pin steps gated by pin_images, check before apply, record right after the push, no cache outside pull requests" || bad "wiring"

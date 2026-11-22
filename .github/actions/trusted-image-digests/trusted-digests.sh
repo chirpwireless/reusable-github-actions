@@ -16,6 +16,8 @@ if [ "${PRODUCTION:-false}" = true ]; then
   if grep -qxF refs/heads/main <<< "$heads"; then branch=main
   elif grep -qxF refs/heads/master <<< "$heads"; then branch=master
   else die "$REPO has neither main nor master"; fi
+  protected=$(gh api "repos/$REPO/branches/$branch" --jq .protected) || die "cannot read the protection of $branch"
+  [ "$protected" = true ] || die "$branch is not protected: production trusts only a protected branch"
 else
   branch=$(gh api "repos/$REPO" --jq .default_branch) || die "cannot read the default branch of $REPO"
 fi
