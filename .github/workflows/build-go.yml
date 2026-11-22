@@ -186,6 +186,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push Docker image
+        id: push-image
         if: ${{ inputs.tag_mode == 'calendar' }}
         uses: docker/build-push-action@v5
         with:
@@ -195,6 +196,13 @@ jobs:
           tags: ${{ env.docker_tag }}:${{ steps.version.outputs.new_version }}
           cache-from: type=registry,ref=${{ env.docker_tag }}:buildcache
           cache-to: type=registry,ref=${{ env.docker_tag }}:buildcache,mode=max
+      - name: Record the image digest
+        if: ${{ inputs.tag_mode == 'calendar' }}
+        uses: chirpwireless/reusable-github-actions/.github/actions/image-digest-record@main
+        with:
+          image: ${{ env.docker_tag }}
+          tag: ${{ steps.version.outputs.new_version }}
+          digest: ${{ steps.push-image.outputs.digest }}
       - id: content-build
         name: Build the content-tagged image
         if: ${{ inputs.tag_mode == 'content' }}

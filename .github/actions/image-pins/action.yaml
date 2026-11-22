@@ -1,0 +1,26 @@
+name: 'Image pins'
+description: 'Installs a helm post-renderer that replaces every ghcr.io/<owner> image reference by its trusted digest and refuses any it has no digest for'
+
+inputs:
+  pins:
+    description: 'image:tag@digest lines from trusted-image-digests'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - shell: bash
+      env:
+        PINS: ${{ inputs.pins }}
+      run: |
+        set -euo pipefail
+        dir=$(mktemp -d "$RUNNER_TEMP/image-pins.XXXXXX")
+        printf '%s\n' "$PINS" | sed '/^$/d' > "$dir/pins"
+        [ -s "$dir/pins" ] || { echo "::error::no image pins"; exit 1; }
+        install -m 0755 "$GITHUB_ACTION_PATH/pin-images.py" "$dir/pin-images"
+        owner=${GITHUB_REPOSITORY_OWNER,,}
+        {
+          echo "IMAGE_PINS_FILE=$dir/pins"
+          echo "IMAGE_PINS_OWNER=$owner"
+          echo "IMAGE_PINS_RENDERER=$dir/pin-images"
+        } >> "$GITHUB_ENV"

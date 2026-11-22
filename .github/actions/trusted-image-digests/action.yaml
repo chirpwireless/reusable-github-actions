@@ -1,0 +1,33 @@
+name: 'Trusted image digests'
+description: 'Resolves a git ref to its commit, checks the commit is on the trusted branch and reads image:tag@digest lines only from successful push runs of that commit'
+
+inputs:
+  git-ref:
+    description: 'Git ref (branch, tag or SHA) to deploy'
+    required: true
+  production:
+    description: 'true: the commit must be on main (master); otherwise on the default branch of the repository'
+    required: true
+  github-token:
+    description: 'Token with actions: read and contents: read on this repository'
+    required: true
+    default: ${{ github.token }}
+
+outputs:
+  sha:
+    description: 'The commit the ref resolves to'
+    value: ${{ steps.digests.outputs.sha }}
+  pins:
+    description: 'image:tag@digest lines, one per pushed image'
+    value: ${{ steps.digests.outputs.pins }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: digests
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        GIT_REF: ${{ inputs.git-ref }}
+        PRODUCTION: ${{ inputs.production }}
+      run: bash "$GITHUB_ACTION_PATH/trusted-digests.sh"
