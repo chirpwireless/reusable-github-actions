@@ -54,7 +54,10 @@ def render(text, prefix, pins, pinned_re):
 
 def check(text, prefix, pins, pinned_re):
     errors = []
-    for token in re.findall(r"[^\s\"'\[\]{},=]*" + re.escape(prefix) + r"[^\s\"'\[\]{},]*", text, flags=re.IGNORECASE):
+    tokens = re.findall(r"[^\s\"'\[\]{},=]*" + re.escape(prefix) + r"[^\s\"'\[\]{},]*", text, flags=re.IGNORECASE)
+    if not tokens:
+        raise ValueError(f"no image of {prefix} in the render")
+    for token in tokens:
         if not pinned_re.match(token):
             errors.append(f"{token} is not an image pinned by digest")
             continue

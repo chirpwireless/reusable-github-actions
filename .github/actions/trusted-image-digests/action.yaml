@@ -6,7 +6,7 @@ inputs:
     description: 'Git ref (branch, tag or SHA) to deploy'
     required: true
   production:
-    description: 'true: the commit must be on main (master); otherwise on the default branch of the repository'
+    description: 'true: the commit must be on main (master), which must be protected; otherwise on the default branch of the repository'
     required: true
   github-token:
     description: 'Token with actions: read and contents: read on this repository'
