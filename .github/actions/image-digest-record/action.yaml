@@ -1,0 +1,31 @@
+name: 'Record an image digest'
+description: 'Records image:tag@digest of a pushed image as an artifact of this run; a pinning deploy reads it only from a push run of a commit on its trusted branch'
+
+inputs:
+  image:
+    description: 'Image name without tag, ghcr.io/<owner>/<name>'
+    required: true
+  tag:
+    description: 'The tag the image was pushed under'
+    required: true
+  digest:
+    description: 'The digest the push returned, sha256:<64 hex>'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - id: record
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        TAG: ${{ inputs.tag }}
+        DIGEST: ${{ inputs.digest }}
+      run: bash "$GITHUB_ACTION_PATH/record.sh"
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: ${{ steps.record.outputs.name }}
+        path: ${{ steps.record.outputs.path }}
+        if-no-files-found: error
+        retention-days: 90
+        overwrite: true

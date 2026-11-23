@@ -21,6 +21,10 @@ on:
         description: "Additional versions, one VERSION_NAME=check-name per line, exported to the helmfile step. A commit without the check gets no variable: read it with requiredEnv"
         type: string
         default: ""
+      pin_images:
+        description: "Deploy every ghcr.io/<owner> image by the digest a push build of the commit recorded; the caller grants actions: read. IMAGE_PINS_FILE lists image:tag@digest for helmfile hooks. A render without any ghcr.io/<owner> image fails"
+        type: boolean
+        default: false
 
 env:
   HOME: /home/runner
@@ -32,12 +36,20 @@ jobs:
     outputs:
       version: ${{steps.fetch-version.outputs.version}}
       extra_env: ${{steps.fetch-version.outputs.extra-env}}
+      sha: ${{steps.digests.outputs.sha}}
+      pins: ${{steps.digests.outputs.pins}}
     steps:
       - id: fetch-version
         uses: chirpwireless/reusable-github-actions/.github/actions/version-fetch@main
         with:
           git-ref: ${{ inputs.version }}
           extra-versions: ${{ inputs.extra_versions }}
+          production: ${{ inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod' }}
+      - id: digests
+        if: ${{ inputs.pin_images }}
+        uses: chirpwireless/reusable-github-actions/.github/actions/trusted-image-digests@main
+        with:
+          git-ref: ${{ inputs.version }}
           production: ${{ inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod' }}
       - env:
           VERSION: ${{ steps.fetch-version.outputs.version }}
@@ -75,6 +87,17 @@ jobs:
             echo "::error::image $VERSION is not a $base build: production deploys only images built from $base"
             exit 1
           fi
+      - name: The checked-out commit is the one whose digests were read
+        if: ${{ inputs.pin_images }}
+        env:
+          SHA: ${{ needs.fetch_version.outputs.sha }}
+        run: |
+          [ "$(git rev-parse HEAD)" = "$SHA" ] || { echo "::error::checked out $(git rev-parse HEAD), digests are of $SHA"; exit 1; }
+      - name: Pin images by digest
+        if: ${{ inputs.pin_images }}
+        uses: chirpwireless/reusable-github-actions/.github/actions/image-pins@main
+        with:
+          pins: ${{ needs.fetch_version.outputs.pins }}
       - name: Export the additional versions
         env:
           EXTRA_ENV: ${{ needs.fetch_version.outputs.extra_env }}
@@ -88,5 +111,13 @@ jobs:
       - name: Deploy using helmfile
         env:
           VERSION: ${{ needs.fetch_version.outputs.version }}
+          PIN_IMAGES: ${{ inputs.pin_images }}
         run: |
-          cd ${{ inputs.deploy_dir }} && helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} apply
+          cd ${{ inputs.deploy_dir }}
+          if [ "$PIN_IMAGES" = true ]; then
+            helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} template --post-renderer "${IMAGE_PINS_RENDERER:?}" > "$RUNNER_TEMP/pinned-render.yaml"
+            "$IMAGE_PINS_RENDERER" --check < "$RUNNER_TEMP/pinned-render.yaml"
+            helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} apply --post-renderer "$IMAGE_PINS_RENDERER"
+          else
+            helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} apply
+          fi
