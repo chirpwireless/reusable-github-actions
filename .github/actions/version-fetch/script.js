@@ -1,4 +1,8 @@
 const MAIN_BUILD_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7}$/;
+const CONTENT_TAG = /^c-[0-9a-f]{16}$/;
+// The value ends up in the job environment and in image tags: a Docker tag, one line.
+const VERSION_VALUE = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/;
+const EXTRA_LINE = /^(VERSION_[A-Z0-9_]+)=([a-z0-9:_-]+)$/;
 
 async function fetchRelease({github, context, core}) {
     const repo = context.repo.repo;
@@ -11,10 +15,6 @@ async function fetchRelease({github, context, core}) {
     core.info(`RELEASE: ${JSON.stringify(res.data)}`);
 
     return res.data.tag_name;
-}
-
-function selectVersionRun(runs) {
-    return runs.find((run) => MAIN_BUILD_VERSION.test(run.output?.title || '')) || runs[0];
 }
 
 async function listChecks({github, context, ref, checkName}) {
@@ -40,7 +40,8 @@ async function fetchVersionFromCheck({github, context, core}) {
     }
 
     // A pull request build publishes its merge-ref image on the PR head commit, so a main commit can carry both.
-    const versionCheck = selectVersionRun(res.data.check_runs);
+    const mainBuild = res.data.check_runs.find((run) => MAIN_BUILD_VERSION.test(run.output?.title || ''));
+    const versionCheck = mainBuild || res.data.check_runs[0];
     core.info(`VERSION CHECK: ${JSON.stringify(versionCheck)}`);
 
     const version = versionCheck.output.title;
@@ -72,22 +73,17 @@ exports.fetchVersion = async ({github, context, core}) => {
     const {GIT_REF, CHECK_NAME} = process.env;
     core.info(`Fetching version for git sha '${GIT_REF}' ('${CHECK_NAME}') ...`);
 
-    const versionFromCheck = await fetchVersionFromCheck({github, context, core});
-    if (versionFromCheck) {
-        return versionFromCheck;
+    const version = await fetchVersionFromCheck({github, context, core}) || await fetchRelease({github, context, core});
+    if (!version) {
+        core.setFailed(`No version found for git sha '${GIT_REF}' ('${CHECK_NAME}') in either checks or releases.`);
+        return '';
     }
-
-    const versionFromRelease = await fetchRelease({github, context, core})
-    if (versionFromRelease) {
-        return versionFromRelease
+    if (!VERSION_VALUE.test(version)) {
+        core.setFailed(`The version found for git sha '${GIT_REF}' ('${CHECK_NAME}') is not a valid image tag.`);
+        return '';
     }
-
-    core.setFailed(`No version found for git sha '${GIT_REF}' ('${CHECK_NAME}') in either checks or releases.`);
-    return '';
+    return version;
 };
-
-const EXTRA_LINE = /^(VERSION_[A-Z0-9_]+)=([a-z0-9:_-]+)$/;
-const EXTRA_VALUE = /^[A-Za-z0-9._-]{1,128}$/;
 
 exports.parseExtraVersions = (text) => {
     const seen = new Set();
@@ -98,11 +94,11 @@ exports.parseExtraVersions = (text) => {
         }
         const match = EXTRA_LINE.exec(line);
         if (!match) {
-            throw new Error(`Invalid extra-versions line '${line}': expected VERSION_NAME=check-name`);
+            throw new Error(`Invalid extra-versions line ${JSON.stringify(line)}: expected VERSION_NAME=check-name`);
         }
         const [, name, checkName] = match;
         if (seen.has(name)) {
-            throw new Error(`Invalid extra-versions line '${line}': the name ${name} is repeated`);
+            throw new Error(`Invalid extra-versions line ${JSON.stringify(line)}: the name ${name} is repeated`);
         }
         seen.add(name);
         extras.push({name, checkName});
@@ -110,21 +106,43 @@ exports.parseExtraVersions = (text) => {
     return extras;
 };
 
+// Returns the single value of the check, undefined when the ref has none; throws on anything a deploy must not trust.
+exports.extraValue = (runs, {checkName, production}) => {
+    if (runs.length === 0) {
+        return undefined;
+    }
+    if (runs.some((run) => run.app?.slug !== 'github-actions')) {
+        throw new Error(`a \`${checkName}\` check was not created by GitHub Actions`);
+    }
+    const values = [...new Set(runs.map((run) => run.output?.title || ''))];
+    if (values.length > 1) {
+        throw new Error(`the \`${checkName}\` checks carry ${values.length} different versions`);
+    }
+    const [value] = values;
+    if (!VERSION_VALUE.test(value)) {
+        throw new Error(`the \`${checkName}\` check carries an invalid version`);
+    }
+    if (production && !CONTENT_TAG.test(value)) {
+        throw new Error(`the \`${checkName}\` check carries ${value}, which is not a content tag`);
+    }
+    return value;
+};
+
 exports.fetchExtra = async ({github, context, core}) => {
-    const {GIT_REF, EXTRA_VERSIONS} = process.env;
+    const {GIT_REF, EXTRA_VERSIONS, PRODUCTION} = process.env;
+    const production = PRODUCTION === 'true';
     const lines = [];
 
     for (const {name, checkName} of exports.parseExtraVersions(EXTRA_VERSIONS)) {
         const res = await listChecks({github, context, ref: GIT_REF, checkName});
-        if (res.data.total_count === 0) {
+        if (res.data.total_count > res.data.check_runs.length) {
+            throw new Error(`ref '${GIT_REF}' has more \`${checkName}\` checks than one page`);
+        }
+        const value = exports.extraValue(res.data.check_runs, {checkName, production});
+        if (value === undefined) {
+            // A commit made before the image existed deploys without it; one whose helmfile needs it fails there.
             core.warning(`No published \`${checkName}\` check found in ref '${GIT_REF}': ${name} is not set.`);
             continue;
-        }
-
-        const value = res.data.check_runs[0].output?.title || '';
-        if (!EXTRA_VALUE.test(value)) {
-            core.setFailed(`The \`${checkName}\` check of ref '${GIT_REF}' carries an invalid version for ${name}.`);
-            return '';
         }
         lines.push(`${name}=${value}`);
     }

@@ -18,7 +18,7 @@ on:
         description: "Path to the helm charts"
         type: string
       extra_versions:
-        description: "Additional versions, one VERSION_NAME=check-name per line"
+        description: "Additional versions, one VERSION_NAME=check-name per line, exported to the helmfile step. A commit without the check gets no variable: read it with requiredEnv"
         type: string
         default: ""
 
@@ -38,8 +38,12 @@ jobs:
         with:
           git-ref: ${{ inputs.version }}
           extra-versions: ${{ inputs.extra_versions }}
-      - run: |
-          echo "Deploying the version ${{steps.fetch-version.outputs.version}}" > $GITHUB_STEP_SUMMARY
+          production: ${{ inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod' }}
+      - env:
+          VERSION: ${{ steps.fetch-version.outputs.version }}
+          EXTRA_ENV: ${{ steps.fetch-version.outputs.extra-env }}
+        run: |
+          { printf 'Deploying the version %s\n' "$VERSION"; [ -z "$EXTRA_ENV" ] || printf '%s\n' "$EXTRA_ENV"; } > "$GITHUB_STEP_SUMMARY"
 
   deploy:
     name: "Deploy to ${{inputs.environment}}"
@@ -75,7 +79,12 @@ jobs:
         env:
           EXTRA_ENV: ${{ needs.fetch_version.outputs.extra_env }}
         run: |
-          [ -z "$EXTRA_ENV" ] || printf '%s\n' "$EXTRA_ENV" >> "$GITHUB_ENV"
+          [ -n "$EXTRA_ENV" ] || exit 0
+          if LC_ALL=C grep -Evxq 'VERSION_[A-Z0-9_]+=[A-Za-z0-9_][A-Za-z0-9._-]{0,127}' <<< "$EXTRA_ENV"; then
+            echo "::error::an additional version is not a VERSION_NAME=tag line"
+            exit 1
+          fi
+          printf '%s\n' "$EXTRA_ENV" >> "$GITHUB_ENV"
       - name: Deploy using helmfile
         env:
           VERSION: ${{ needs.fetch_version.outputs.version }}

@@ -23,7 +23,7 @@ on:
         type: boolean
         default: false
       image_name:
-        description: "Docker image name under the owner namespace. Defaults to service_name"
+        description: "Image name under ghcr.io/<owner>; empty means service_name"
         type: string
         default: ""
       dockerfile:
@@ -35,15 +35,15 @@ on:
         type: string
         default: "build"
       run_checks:
-        description: "false skips the tests and the linter"
+        description: "false skips the tests and the linters; another job of the same commit runs them"
         type: boolean
         default: true
       tag_mode:
-        description: "calendar (version from the date) or content (tag from the content of the inputs, pushed only when absent)"
+        description: "calendar: a version from the date, pushed every build; content: a tag from the content of the inputs, pushed only when absent"
         type: string
         default: "calendar"
       content_inputs_cmd:
-        description: "Required for tag_mode content: command run from the repository root that prints the input file paths, one per line"
+        description: "Required for tag_mode content: a command run from the repository root that prints the input file paths, one per line"
         type: string
         default: ""
       version_check_name:
@@ -77,11 +77,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - id: built
-        name: Record the built commit
-        if: ${{ inputs.tag_mode == 'content' }}
+      - name: Check the inputs and keep the Docker config out of the workspace
         shell: bash
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        env:
+          TAG_MODE: ${{ inputs.tag_mode }}
+          CONTENT_INPUTS_CMD: ${{ inputs.content_inputs_cmd }}
+        run: |
+          case "$TAG_MODE" in
+            calendar) ;;
+            content) [ -n "$CONTENT_INPUTS_CMD" ] || { echo "::error::content_inputs_cmd is required for tag_mode content"; exit 1; } ;;
+            *) echo "::error::tag_mode must be calendar or content, got '$TAG_MODE'"; exit 1 ;;
+          esac
+          # The workspace is HOME, so the default Docker config would sit in the build context.
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/docker-config" >> "$GITHUB_ENV"
       - id: calendar
         if: ${{ inputs.tag_mode == 'calendar' }}
         uses: chirpwireless/reusable-github-actions/.github/actions/calendar-version@main
@@ -128,55 +136,13 @@ jobs:
       - name: Install dependencies
         run: make install
       - id: content
-        name: Compute the content tag
         if: ${{ inputs.tag_mode == 'content' }}
-        shell: bash
-        env:
-          CONTENT_INPUTS_CMD: ${{ inputs.content_inputs_cmd }}
-          DOCKERFILE: ${{ inputs.dockerfile }}
-        run: |
-          set -euo pipefail
-          if [ -z "$CONTENT_INPUTS_CMD" ]; then
-            echo "::error::content_inputs_cmd is required for tag_mode content"
-            exit 1
-          fi
-          root=$(realpath -- .)
-          raw=$(mktemp)
-          bash -c "set -euo pipefail; $CONTENT_INPUTS_CMD" > "$raw"
-          if ! grep -q . "$raw"; then
-            echo "::error::content_inputs_cmd printed no paths"
-            exit 1
-          fi
-          paths=$(mktemp)
-          while IFS= read -r line || [ -n "$line" ]; do
-            if [ -n "$line" ]; then printf '%s\n' "$line" >> "$paths"; fi
-          done < "$raw"
-          printf '%s\n' "$DOCKERFILE" >> "$paths"
-          LC_ALL=C sort -u "$paths" -o "$paths"
-          list=$(mktemp)
-          while IFS= read -r path; do
-            case "$path" in
-              /*) echo "::error::absolute path in the inputs: $path"; exit 1 ;;
-              *$'\r'*) echo "::error::carriage return in the inputs path"; exit 1 ;;
-            esac
-            if [ -L "$path" ] || [ ! -f "$path" ]; then
-              echo "::error::not a regular file: $path"
-              exit 1
-            fi
-            real=$(realpath -e -- "$path")
-            case "$real" in
-              "$root"/*) ;;
-              *) echo "::error::path outside the repository: $path"; exit 1 ;;
-            esac
-            sum=$(sha256sum -- "$path")
-            printf '%s\t%s\n' "$path" "${sum%% *}" >> "$list"
-          done < "$paths"
-          printf 'buildkit\t%s\n' "$BUILDKIT_IMAGE" >> "$list"
-          LC_ALL=C sort "$list" -o "$list"
-          echo "Content inputs:"
-          cat "$list"
-          hash=$(sha256sum "$list" | cut -d' ' -f1)
-          echo "tag=c-${hash:0:16}" >> "$GITHUB_OUTPUT"
+        uses: chirpwireless/reusable-github-actions/.github/actions/content-tag@main
+        with:
+          inputs-cmd: ${{ inputs.content_inputs_cmd }}
+          dockerfile: ${{ inputs.dockerfile }}
+          buildkit-image: ${{ env.BUILDKIT_IMAGE }}
+          version-sha: ${{ github.event.pull_request.head.sha || github.sha }}
       - id: version
         shell: bash
         env:
@@ -184,59 +150,10 @@ jobs:
           CALENDAR: ${{ steps.calendar.outputs.new_version }}
           CONTENT: ${{ steps.content.outputs.tag }}
         run: |
-          case "$TAG_MODE" in
-            calendar|content) ;;
-            *) echo "::error::tag_mode must be calendar or content, got '$TAG_MODE'"; exit 1 ;;
-          esac
-          echo "new_version=${CALENDAR:-$CONTENT}" >> "$GITHUB_OUTPUT"
-      - name: "Create a summary"
-        run: |
-          echo "Building a new revision ${{steps.version.outputs.new_version}}" > $GITHUB_STEP_SUMMARY
-      - name: Set up Docker Buildx (pinned BuildKit)
-        if: ${{ inputs.tag_mode == 'content' }}
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
-      - name: Set up Docker Buildx
-        if: ${{ inputs.tag_mode == 'calendar' }}
-        uses: docker/setup-buildx-action@v3
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: registry
-        name: Check the tag in the registry
-        if: ${{ inputs.tag_mode == 'content' }}
-        shell: bash
-        env:
-          IMAGE: ${{ env.docker_tag }}
-          TAG: ${{ steps.version.outputs.new_version }}
-        run: |
-          set -uo pipefail
-          manifest="$RUNNER_TEMP/registry-manifest.json"
-          errfile="$RUNNER_TEMP/registry-inspect.err"
-          if docker buildx imagetools inspect --raw "$IMAGE:$TAG" > "$manifest" 2> "$errfile"; then
-            media=$(jq -r '.mediaType // empty' "$manifest")
-            case "$media" in
-              application/vnd.docker.distribution.manifest.v2+json|application/vnd.oci.image.manifest.v1+json) ;;
-              *) echo "::error::$IMAGE:$TAG is not a single-platform image manifest (mediaType '$media')"; exit 1 ;;
-            esac
-            config=$(jq -r '.config.digest // empty' "$manifest")
-            if ! printf '%s' "$config" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
-              echo "::error::$IMAGE:$TAG has no valid config digest in the registry manifest"
-              exit 1
-            fi
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "config=$config" >> "$GITHUB_OUTPUT"
-          else
-            out=$(cat "$errfile")
-            case "$out" in
-              *": not found") echo "exists=false" >> "$GITHUB_OUTPUT" ;;
-              *) echo "::error::cannot inspect $IMAGE:$TAG: $out"; exit 1 ;;
-            esac
-          fi
+          if [ "$TAG_MODE" = content ]; then version=$CONTENT; else version=$CALENDAR; fi
+          [ -n "$version" ] || { echo "::error::no version computed"; exit 1; }
+          echo "new_version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building a new revision $version" > "$GITHUB_STEP_SUMMARY"
       - name: Run build
         env:
           MAKE_TARGET: ${{ inputs.make_target }}
@@ -259,6 +176,15 @@ jobs:
           version: ${{ inputs.golangci_lint_version }}
           working-directory: ${{ inputs.app_dir }}
           args: --timeout=10m
+      - name: Set up Docker Buildx
+        if: ${{ inputs.tag_mode == 'calendar' }}
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push Docker image
         if: ${{ inputs.tag_mode == 'calendar' }}
         uses: docker/build-push-action@v5
@@ -269,63 +195,26 @@ jobs:
           tags: ${{ env.docker_tag }}:${{ steps.version.outputs.new_version }}
           cache-from: type=registry,ref=${{ env.docker_tag }}:buildcache
           cache-to: type=registry,ref=${{ env.docker_tag }}:buildcache,mode=max
-      - id: image
-        name: Build the reproducible image
+      - id: content-build
+        name: Build the content-tagged image
         if: ${{ inputs.tag_mode == 'content' }}
-        uses: docker/build-push-action@v5
-        env:
-          SOURCE_DATE_EPOCH: "0"
+        uses: chirpwireless/reusable-github-actions/.github/actions/content-image-build@main
         with:
-          context: .
-          file: ${{ inputs.dockerfile }}
-          platforms: linux/amd64
-          provenance: false
-          sbom: false
-          no-cache: true
-          outputs: type=image,name=${{ env.docker_tag }}:${{ steps.version.outputs.new_version }},push=${{ steps.registry.outputs.exists != 'true' }},rewrite-timestamp=true
-      - name: Compare the image with the registry
+          image: ${{ env.docker_tag }}
+          tag: ${{ steps.version.outputs.new_version }}
+          dockerfile: ${{ inputs.dockerfile }}
+          buildkit-image: ${{ env.BUILDKIT_IMAGE }}
+      - name: Push the content-tagged image when its tag is absent
         if: ${{ inputs.tag_mode == 'content' }}
-        shell: bash
-        env:
-          TAG: ${{ steps.version.outputs.new_version }}
-          EXISTS: ${{ steps.registry.outputs.exists }}
-          REGISTRY_CONFIG: ${{ steps.registry.outputs.config }}
-          METADATA: ${{ steps.image.outputs.metadata }}
-        run: |
-          set -uo pipefail
-          built=$(printf '%s' "$METADATA" | jq -r '.["containerimage.config.digest"] // empty')
-          if ! printf '%s' "$built" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
-            pushed=true
-            [ "$EXISTS" != "true" ] || pushed=false
-            echo "content-image tag=$TAG built_config=missing registry_config=${REGISTRY_CONFIG:-absent} pushed=$pushed"
-            echo "::error::the build did not report a config digest"
-            exit 1
-          fi
-          if [ "$EXISTS" != "true" ]; then
-            echo "content-image tag=$TAG built_config=$built registry_config=absent pushed=true"
-            exit 0
-          fi
-          echo "content-image tag=$TAG built_config=$built registry_config=$REGISTRY_CONFIG pushed=false"
-          if [ "$built" != "$REGISTRY_CONFIG" ]; then
-            echo "::error::the build is not reproducible: built $built, registry $REGISTRY_CONFIG"
-            exit 1
-          fi
-      - id: publishable
-        name: Check that the built commit is the one the version is published on
-        if: ${{ inputs.tag_mode == 'content' }}
-        shell: bash
-        env:
-          VERSION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          BUILT_SHA: ${{ steps.built.outputs.sha }}
-        run: |
-          if [ "$BUILT_SHA" = "$VERSION_SHA" ]; then
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::the built commit differs from $VERSION_SHA (merge ref or base checkout): the version check is not published"
-          fi
+        uses: chirpwireless/reusable-github-actions/.github/actions/content-image-publish@main
+        with:
+          image: ${{ env.docker_tag }}
+          tag: ${{ steps.version.outputs.new_version }}
+          dockerfile: ${{ inputs.dockerfile }}
+          buildkit-image: ${{ env.BUILDKIT_IMAGE }}
+          built-config: ${{ steps.content-build.outputs.config }}
       - name: Publish Version
-        if: ${{ inputs.tag_mode == 'calendar' || steps.publishable.outputs.publish == 'true' }}
+        if: ${{ inputs.tag_mode == 'calendar' || steps.content.outputs.publish == 'true' }}
         uses: chirpwireless/reusable-github-actions/.github/actions/version-publish@main
         with:
           commit-sha: ${{ github.event.pull_request.head.sha || github.sha }}

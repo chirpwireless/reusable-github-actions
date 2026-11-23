@@ -1,0 +1,64 @@
+name: 'Publish a content-tagged image'
+description: 'Pushes the image only when its tag is absent in the registry; otherwise the registry image must have the built config digest'
+
+inputs:
+  image:
+    description: 'Image repository, ghcr.io/<owner>/<name>; the job must be logged in to it'
+    required: true
+  tag:
+    description: 'Content tag of the image'
+    required: true
+  dockerfile:
+    description: 'Path to the Dockerfile from the repository root'
+    required: true
+  buildkit-image:
+    description: 'BuildKit image with digest; the same as for the build'
+    required: true
+  built-config:
+    description: 'Config digest from content-image-build'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: docker/setup-buildx-action@v3
+      with:
+        driver-opts: image=${{ inputs.buildkit-image }}
+    - id: registry
+      shell: bash
+      env:
+        REF: ${{ inputs.image }}:${{ inputs.tag }}
+      run: |
+        config=$("$GITHUB_ACTION_PATH/registry-config.sh" "$REF")
+        echo "config=$config" >> "$GITHUB_OUTPUT"
+    - if: steps.registry.outputs.config != 'absent'
+      shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+        BUILT: ${{ inputs.built-config }}
+        REGISTRY: ${{ steps.registry.outputs.config }}
+      run: '"$GITHUB_ACTION_PATH/same-config.sh" "$TAG" "$BUILT" "$REGISTRY"'
+    - id: push
+      if: steps.registry.outputs.config == 'absent'
+      uses: docker/build-push-action@v5
+      env:
+        SOURCE_DATE_EPOCH: "0"
+      with:
+        context: .
+        file: ${{ inputs.dockerfile }}
+        platforms: linux/amd64
+        provenance: false
+        sbom: false
+        no-cache: true
+        outputs: type=image,name=${{ inputs.image }}:${{ inputs.tag }},push=true,rewrite-timestamp=true
+    - if: steps.registry.outputs.config == 'absent'
+      shell: bash
+      env:
+        REF: ${{ inputs.image }}:${{ inputs.tag }}
+        TAG: ${{ inputs.tag }}
+        BUILT: ${{ inputs.built-config }}
+        METADATA: ${{ steps.push.outputs.metadata }}
+      run: |
+        pushed=$("$GITHUB_ACTION_PATH/../content-image-build/config-digest.sh")
+        registry=$("$GITHUB_ACTION_PATH/registry-config.sh" "$REF")
+        "$GITHUB_ACTION_PATH/same-config.sh" "$TAG" "$BUILT" "$registry" "$pushed"
