@@ -25,6 +25,10 @@ on:
         description: "Deploy every ghcr.io/<owner> image by the digest a push build of the commit recorded; the caller grants actions: read. IMAGE_PINS_FILE lists image:tag@digest for helmfile hooks. A render without any ghcr.io/<owner> image fails"
         type: boolean
         default: false
+      render_policy_cmd:
+        description: "Path, relative to the repository root, of an executable the deploy job runs as the gate of the deploy: '<path> source' before any helmfile call, then '<path> render' with the output of helmfile template (same arguments and environment as the apply that follows, the pinned render with pin_images) on stdin. Either failing stops the job before apply. It gets RENDER_POLICY_ENVIRONMENT, RENDER_POLICY_NAMESPACE and RENDER_POLICY_DEPLOY_DIR. Empty: no gate, the deploy is unchanged"
+        type: string
+        default: ""
 
 env:
   HOME: /home/runner
@@ -112,12 +116,37 @@ jobs:
         env:
           VERSION: ${{ needs.fetch_version.outputs.version }}
           PIN_IMAGES: ${{ inputs.pin_images }}
+          RENDER_POLICY_CMD: ${{ inputs.render_policy_cmd }}
+          RENDER_POLICY_ENVIRONMENT: ${{ inputs.environment }}
+          RENDER_POLICY_NAMESPACE: ${{ inputs.namespace || inputs.environment }}
+          RENDER_POLICY_DEPLOY_DIR: ${{ inputs.deploy_dir }}
         run: |
+          policy=
+          if [ -n "$RENDER_POLICY_CMD" ]; then
+            if ! printf '%s\n' "$RENDER_POLICY_CMD" | LC_ALL=C grep -Eqx '[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*' \
+              || printf '%s\n' "$RENDER_POLICY_CMD" | grep -Eq '(^|/)\.\.?(/|$)'; then
+              echo "::error::render_policy_cmd is not a relative path inside the repository"
+              exit 1
+            fi
+            policy=$PWD/$RENDER_POLICY_CMD
+            if [ ! -f "$policy" ] || [ ! -x "$policy" ]; then
+              echo "::error::render_policy_cmd $RENDER_POLICY_CMD is not an executable file of the commit"
+              exit 1
+            fi
+            "$policy" source || { echo "::error::the deploy gate $RENDER_POLICY_CMD refused the source of the commit"; exit 1; }
+          fi
           cd ${{ inputs.deploy_dir }}
           if [ "$PIN_IMAGES" = true ]; then
             helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} template --post-renderer "${IMAGE_PINS_RENDERER:?}" > "$RUNNER_TEMP/pinned-render.yaml"
             "$IMAGE_PINS_RENDERER" --check < "$RUNNER_TEMP/pinned-render.yaml"
+            if [ -n "$policy" ]; then
+              "$policy" render < "$RUNNER_TEMP/pinned-render.yaml" || { echo "::error::the deploy gate $RENDER_POLICY_CMD refused the render"; exit 1; }
+            fi
             helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} apply --post-renderer "$IMAGE_PINS_RENDERER"
           else
+            if [ -n "$policy" ]; then
+              helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} template > "$RUNNER_TEMP/policy-render.yaml"
+              "$policy" render < "$RUNNER_TEMP/policy-render.yaml" || { echo "::error::the deploy gate $RENDER_POLICY_CMD refused the render"; exit 1; }
+            fi
             helmfile -e ${{inputs.environment}} -n ${{inputs.namespace || inputs.environment}} apply
           fi
