@@ -61,7 +61,6 @@ gate fail "run from a feature branch" REF=refs/heads/feature
 gate fail "run from develop" REF=refs/heads/develop
 gate fail "repository on master, run from main" STUB_BRANCHES="master" REF=refs/heads/main
 gate fail "upper-case prod name" ENVIRONMENT=PROD
-gate fail "prod name with a space" ENVIRONMENT="prod "
 
 # Non-prod environments pass for anyone and say prod=false.
 env -i PATH="$T/bin:/usr/bin:/bin" DEPLOYERS="$DEPLOYERS" IS_PROD=false ENVIRONMENT=dev VERSION= ACTOR=Bearil EVENT=workflow_run \

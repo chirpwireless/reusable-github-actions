@@ -47,6 +47,19 @@ jobs:
         run: |
           printf 'Deploying the version %s\n' "$VERSION" > "$GITHUB_STEP_SUMMARY"
 
+  starter:
+    # A re-run of the deploy job alone skips the gate; this job turns a refused starter into a red run.
+    needs: gate
+    if: ${{ needs.gate.outputs.prod == 'true' && !contains(fromJSON(needs.gate.outputs.deployers), github.triggering_actor) }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - env:
+          ACTOR: ${{ github.triggering_actor }}
+        run: |
+          echo "::error::$ACTOR may not start a prod deploy"
+          exit 1
+
   deploy:
     name: "Deploy to ${{inputs.environment}}"
     needs: [fetch_version, gate]
