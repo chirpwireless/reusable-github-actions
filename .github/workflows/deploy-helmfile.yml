@@ -30,6 +30,14 @@ env:
   HOME: /home/runner
 
 jobs:
+  gate:
+    uses: chirpwireless/reusable-github-actions/.github/workflows/prod-deploy-gate.yml@main
+    permissions:
+      contents: read
+    with:
+      environment: ${{ inputs.environment }}
+      version: ${{ inputs.version }}
+
   fetch_version:
     # Reads the GitHub API only: a dev runner must not choose what prod deploys.
     runs-on: ubuntu-latest
@@ -59,7 +67,7 @@ jobs:
 
   deploy:
     name: "Deploy to ${{inputs.environment}}"
-    needs: fetch_version
+    needs: [fetch_version, gate]
     runs-on:
       group: ${{ (inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod') && 'hetzner-k3s-prod' || (inputs.environment == 'staging' || inputs.environment == 'kiloiot-staging' || inputs.environment == 'fleet-staging') && 'hetzner-k3s-staging' || 'hetzner-k3s-dev' }}
     environment:

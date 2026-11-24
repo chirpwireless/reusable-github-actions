@@ -1,0 +1,55 @@
+name: Prod deploy gate
+
+# The one list of people who may start a prod deploy. Deploy workflows call this before their prod-runner job.
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  gate:
+    name: "Who may deploy to ${{ inputs.environment }}"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Prod deploys start only by hand, by a release person, from the default branch, with a full SHA on it
+        shell: bash
+        env:
+          DEPLOYERS: "wirelesstim VladimirYarovoy91"
+          ENVIRONMENT: ${{ inputs.environment }}
+          VERSION: ${{ inputs.version }}
+          ACTOR: ${{ github.triggering_actor }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+          case "$(lower "$ENVIRONMENT")" in
+            prod|kiloiot-prod|fleet-prod) ;;
+            *) echo "$ENVIRONMENT is not a prod environment: nothing to check"; exit 0 ;;
+          esac
+          fail() { echo "::error::$1"; exit 1; }
+          [ "$EVENT" = workflow_dispatch ] || fail "prod deploys start only by hand (workflow_dispatch); this run came from $EVENT"
+          allowed=no
+          for d in $DEPLOYERS; do [ "$(lower "$d")" = "$(lower "$ACTOR")" ] && allowed=yes; done
+          [ "$allowed" = yes ] || fail "$ACTOR may not start a prod deploy; allowed: $DEPLOYERS"
+          base=$(gh api "repos/$REPO" -q .default_branch)
+          [ -n "$base" ] || fail "cannot read the default branch of $REPO"
+          [ "$REF" = "refs/heads/$base" ] || fail "prod deploys run only from $base; this run is from $REF"
+          [[ "$VERSION" =~ ^[0-9a-f]{40}$ ]] || fail "version must be a full 40-character commit SHA, got '$VERSION'"
+          status=$(gh api "repos/$REPO/compare/$VERSION...$base" -q .status) || fail "commit $VERSION not found in $REPO"
+          case "$status" in
+            identical|behind) ;;
+            *) fail "commit $VERSION is not on $base (compare: $status)" ;;
+          esac
+          echo "ok: $ACTOR deploys $VERSION from $base to $ENVIRONMENT"
