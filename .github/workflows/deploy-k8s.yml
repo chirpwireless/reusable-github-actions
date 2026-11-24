@@ -50,12 +50,13 @@ jobs:
   deploy:
     name: "Deploy to ${{inputs.environment}}"
     needs: [fetch_version, gate]
+    if: ${{ needs.gate.outputs.prod != 'true' || contains(fromJSON(needs.gate.outputs.deployers), github.triggering_actor) }}
     runs-on:
-      group: ${{ (inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod') && 'hetzner-k3s-prod' || (inputs.environment == 'staging' || inputs.environment == 'kiloiot-staging' || inputs.environment == 'fleet-staging') && 'hetzner-k3s-staging' || 'hetzner-k3s-dev' }}
+      group: ${{ needs.gate.outputs.prod == 'true' && 'hetzner-k3s-prod' || (inputs.environment == 'staging' || inputs.environment == 'kiloiot-staging' || inputs.environment == 'fleet-staging') && 'hetzner-k3s-staging' || 'hetzner-k3s-dev' }}
     environment:
       name: ${{ inputs.environment }}
     env:
-      IS_PROD: ${{ (inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod') }}
+      IS_PROD: ${{ needs.gate.outputs.prod == 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
