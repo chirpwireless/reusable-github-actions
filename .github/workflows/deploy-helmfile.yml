@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       version:
-        description: "Git reference (branch, tag or SHA) of commit to deploy"
+        description: "Git reference of the commit to deploy; prod takes only a full commit SHA on main"
         type: string
       environment:
         required: true
@@ -34,8 +34,17 @@ env:
   HOME: /home/runner
 
 jobs:
+  gate:
+    uses: chirpwireless/reusable-github-actions/.github/workflows/prod-deploy-gate.yml@main
+    permissions:
+      contents: read
+    with:
+      environment: ${{ inputs.environment }}
+      version: ${{ inputs.version }}
+
   fetch_version:
     # Reads the GitHub API only: a dev runner must not choose what prod deploys.
+    needs: gate
     runs-on: ubuntu-latest
     outputs:
       version: ${{steps.fetch-version.outputs.version}}
@@ -48,28 +57,42 @@ jobs:
         with:
           git-ref: ${{ inputs.version }}
           extra-versions: ${{ inputs.extra_versions }}
-          production: ${{ inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod' }}
+          production: ${{ needs.gate.outputs.prod == 'true' }}
       - id: digests
         if: ${{ inputs.pin_images }}
         uses: chirpwireless/reusable-github-actions/.github/actions/trusted-image-digests@main
         with:
           git-ref: ${{ inputs.version }}
-          production: ${{ inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod' }}
+          production: ${{ needs.gate.outputs.prod == 'true' }}
       - env:
           VERSION: ${{ steps.fetch-version.outputs.version }}
           EXTRA_ENV: ${{ steps.fetch-version.outputs.extra-env }}
         run: |
           { printf 'Deploying the version %s\n' "$VERSION"; [ -z "$EXTRA_ENV" ] || printf '%s\n' "$EXTRA_ENV"; } > "$GITHUB_STEP_SUMMARY"
 
+  starter:
+    # A re-run of the deploy job alone skips the gate; this job turns a refused starter into a red run.
+    needs: gate
+    if: ${{ needs.gate.outputs.prod == 'true' && !contains(fromJSON(needs.gate.outputs.deployers), github.triggering_actor) }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - env:
+          ACTOR: ${{ github.triggering_actor }}
+        run: |
+          echo "::error::$ACTOR may not start a prod deploy"
+          exit 1
+
   deploy:
     name: "Deploy to ${{inputs.environment}}"
-    needs: fetch_version
+    needs: [fetch_version, gate]
+    if: ${{ needs.gate.outputs.prod != 'true' || contains(fromJSON(needs.gate.outputs.deployers), github.triggering_actor) }}
     runs-on:
-      group: ${{ (inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod') && 'hetzner-k3s-prod' || (inputs.environment == 'staging' || inputs.environment == 'kiloiot-staging' || inputs.environment == 'fleet-staging') && 'hetzner-k3s-staging' || 'hetzner-k3s-dev' }}
+      group: ${{ needs.gate.outputs.prod == 'true' && 'hetzner-k3s-prod' || (inputs.environment == 'staging' || inputs.environment == 'kiloiot-staging' || inputs.environment == 'fleet-staging') && 'hetzner-k3s-staging' || 'hetzner-k3s-dev' }}
     environment:
       name: ${{ inputs.environment }}
     env:
-      IS_PROD: ${{ (inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod') }}
+      IS_PROD: ${{ needs.gate.outputs.prod == 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:

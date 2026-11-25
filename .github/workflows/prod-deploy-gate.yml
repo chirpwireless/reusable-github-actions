@@ -1,0 +1,80 @@
+name: Prod deploy gate
+
+# The one place that says which environments are prod and who may start a prod deploy.
+# Deploy workflows pick the runner by the `prod` output and re-check `deployers` on their prod job, so a re-run
+# of that job alone is checked against whoever re-ran it.
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      version:
+        required: false
+        type: string
+        default: ""
+    outputs:
+      prod:
+        description: "'true' for a prod environment that passed the gate, 'false' otherwise"
+        value: ${{ jobs.gate.outputs.prod }}
+      deployers:
+        description: "JSON array of the logins allowed to start a prod deploy"
+        value: ${{ jobs.gate.outputs.deployers }}
+
+permissions: {}
+
+jobs:
+  gate:
+    name: "Who may deploy to ${{ inputs.environment }}"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      prod: ${{ steps.check.outputs.prod }}
+      deployers: ${{ steps.check.outputs.deployers }}
+    steps:
+      - name: Prod deploys start only by hand, by a release person, from main, with a full SHA on main
+        id: check
+        shell: bash
+        env:
+          DEPLOYERS: "wirelesstim:173720956 VladimirYarovoy91:186682877 Bearil:6340083"
+          IS_PROD: ${{ inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod' }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          VERSION: ${{ inputs.version }}
+          ACTOR: ${{ github.triggering_actor }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          say() { printf '%s' "$1" | tr -d '\r\n'; }
+          fail() { printf '::error::%s\n' "$(say "$1")"; exit 1; }
+          lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+          logins=""
+          for d in $DEPLOYERS; do logins="$logins\"$(lower "${d%%:*}")\","; done
+          echo "deployers=[${logins%,}]" >> "$GITHUB_OUTPUT"
+          if [ "$IS_PROD" != true ]; then
+            echo "prod=false" >> "$GITHUB_OUTPUT"
+            echo "$(say "$ENVIRONMENT") is not a prod environment: nothing to check"
+            exit 0
+          fi
+          [[ "$ENVIRONMENT" =~ ^[a-z0-9-]+$ ]] || fail "prod environment name must be lower-case letters, digits and dashes"
+          [ "$EVENT" = workflow_dispatch ] || fail "prod deploys start only by hand (workflow_dispatch); this run came from $EVENT"
+          want_id=""
+          for d in $DEPLOYERS; do if [ "$(lower "${d%%:*}")" = "$(lower "$ACTOR")" ]; then want_id=${d#*:}; fi; done
+          [ -n "$want_id" ] || fail "$ACTOR may not start a prod deploy"
+          got_id=$(gh api "users/$ACTOR" -q .id) || fail "cannot read the GitHub user $ACTOR"
+          [ "$got_id" = "$want_id" ] || fail "$ACTOR is not the listed account (id $got_id, listed $want_id)"
+          if gh api "repos/$REPO/branches/main" --silent 2>/dev/null; then base=main
+          elif gh api "repos/$REPO/branches/master" --silent 2>/dev/null; then base=master
+          else fail "$REPO has neither main nor master"; fi
+          [ "$REF" = "refs/heads/$base" ] || fail "prod deploys run only from $base; this run is from $REF"
+          [[ "$VERSION" =~ ^[0-9a-f]{40}$ ]] || fail "version must be a full 40-character commit SHA"
+          status=$(gh api "repos/$REPO/compare/$base...$VERSION" -q .status) || fail "commit $VERSION not found in $REPO"
+          case "$status" in
+            identical|behind) ;;
+            *) fail "commit $VERSION is not on $base (compared with $base: $status)" ;;
+          esac
+          echo "prod=true" >> "$GITHUB_OUTPUT"
+          echo "ok: $ACTOR deploys $VERSION from $base to $ENVIRONMENT"

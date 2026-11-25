@@ -22,5 +22,6 @@ jobs:
           bash tests/content-image.test.sh
           bash tests/deploy-helmfile.test.sh
           bash tests/image-pins.test.sh
+          bash tests/prod-deploy-gate.test.sh
       - name: version-fetch
         run: node --test tests/*.test.js
