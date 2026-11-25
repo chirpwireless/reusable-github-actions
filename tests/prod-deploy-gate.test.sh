@@ -19,7 +19,7 @@ cat > "$T/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 # Stub: users/<login> -> id; branches/<b> -> exists if listed; compare/<base>...<sha> -> status by the commit's place.
 case "$2" in
-  users/*) login=${2#users/}; case "${login,,}" in wirelesstim) echo 173720956 ;; vladimiryarovoy91) echo 186682877 ;; impostor) echo 999 ;; *) exit 1 ;; esac ;;
+  users/*) login=${2#users/}; case "${login,,}" in wirelesstim) echo 173720956 ;; vladimiryarovoy91) echo 186682877 ;; bearil) echo 6340083 ;; impostor) echo 999 ;; outsider) echo 4242 ;; *) exit 1 ;; esac ;;
   repos/o/r/branches/*) b=${2##*/}; case " $STUB_BRANCHES " in *" $b "*) exit 0 ;; *) exit 1 ;; esac ;;
   repos/o/r/compare/*) echo "$2" > "$STUB_DIR/compared"; sha=${2##*...}
     case "$sha" in "$TIP") echo identical ;; "$OLD") echo behind ;; "$UNMERGED") echo ahead ;; "$SIDE") echo diverged ;; *) exit 1 ;; esac ;;
@@ -47,7 +47,8 @@ gate pass "login in another letter case" ACTOR=vladimiryarovoy91
 gate pass "an older commit of main (rollback)" VERSION="$OLD"
 gate pass "fleet-prod" ENVIRONMENT=fleet-prod
 gate pass "repository on master" STUB_BRANCHES="master" REF=refs/heads/master
-gate fail "the automation account" ACTOR=Bearil
+gate pass "the owner Bearil" ACTOR=Bearil
+gate fail "an organization member not on the list" ACTOR=outsider
 gate fail "a renamed account reusing a listed login" ACTOR=impostor DEPLOYERS="impostor:1 $DEPLOYERS"
 gate fail "empty actor" ACTOR=
 gate fail "a commit not merged into main" VERSION="$UNMERGED"
@@ -67,7 +68,7 @@ env -i PATH="$T/bin:/usr/bin:/bin" DEPLOYERS="$DEPLOYERS" IS_PROD=false ENVIRONM
   REF=refs/heads/develop REPO=o/r GH_TOKEN=x GITHUB_OUTPUT="$T/out" bash "$T/step.sh" > "$T/log" 2>&1 \
   && grep -qx 'prod=false' "$T/out" && ok "dev passes for anyone, prod=false" || bad "dev"
 # The deployers output is the lower-case login list the deploy job re-checks on re-runs.
-grep -qx 'deployers=\["wirelesstim","vladimiryarovoy91"\]' "$T/out" && ok "deployers output" || { bad "deployers output"; cat "$T/out"; }
+grep -qx 'deployers=\["wirelesstim","vladimiryarovoy91","bearil"\]' "$T/out" && ok "deployers output" || { bad "deployers output"; cat "$T/out"; }
 # The compare goes from main to the version, so "behind" means the version is on main.
 gate pass "compare direction" VERSION="$OLD" && grep -qx "repos/o/r/compare/main...$OLD" "$T/compared" && ok "compared main...version" || bad "compare direction"
 

@@ -37,7 +37,7 @@ jobs:
         id: check
         shell: bash
         env:
-          DEPLOYERS: "wirelesstim:173720956 VladimirYarovoy91:186682877"
+          DEPLOYERS: "wirelesstim:173720956 VladimirYarovoy91:186682877 Bearil:6340083"
           IS_PROD: ${{ inputs.environment == 'prod' || inputs.environment == 'kiloiot-prod' || inputs.environment == 'fleet-prod' }}
           ENVIRONMENT: ${{ inputs.environment }}
           VERSION: ${{ inputs.version }}
